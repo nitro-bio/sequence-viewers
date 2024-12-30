@@ -302,16 +302,28 @@ export const SeqMetadataBar = ({
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
-        "flex gap-2 rounded-full px-2 py-px text-xs !opacity-100",
+        "flex gap-1 rounded-full px-2 py-px text-xs !opacity-100",
         "ml-auto",
         activeAnnotation.className,
       )}
     >
-      <span>Label: {activeAnnotation.text}</span>
-      <span>Type: {activeAnnotation.type}</span>
-      <span>Direction: {activeAnnotation.direction}</span>
-      <span>
-        from {activeAnnotation.start} - {activeAnnotation.end}
+      <span className="flex gap-1">
+        <p className="opacity-70">Label: </p>
+        <p className="">{activeAnnotation.text}</p>
+      </span>
+      <span className="flex gap-1">
+        <p className="opacity-70">Type: </p>
+        <p className="">{activeAnnotation.type}</p>
+      </span>
+      <span className="flex gap-1">
+        <p className="opacity-70">Direction: </p>
+        <p className="">{activeAnnotation.direction}</p>
+      </span>
+      <span className="flex gap-1">
+        <p className="opacity-70">from</p>
+        <p className="">
+          {activeAnnotation.start} - {activeAnnotation.end}
+        </p>
       </span>
     </span>
   ) : null;

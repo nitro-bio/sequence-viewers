@@ -34,8 +34,8 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
       name: "Nitro UI",
-      formats: ["es", "umd"],
-      fileName: (format) => `nitro-ui.${format}.js`,
+      formats: ["es"],
+      fileName: (format) => `nitro-sequence-viewers.${format}.js`,
     },
     rollupOptions: {
       external: ["react", "react-dom", "styled-components"],

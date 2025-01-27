@@ -5,7 +5,7 @@
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",
-    "build-css": "npx tailwindcss -o ./nitro.css --minify && mv ./nitro.css ./dist/nitro.css",
+    "build-css": "npx tailwindcss -o ./nitro-sequence-viewers.css --minify && mv ./nitro-sequence-viewers.css ./dist/nitro-sequence-viewers.css",
     "dev": "pnpm storybook dev -p 6006",
     "build-storybook": "storybook build",
     "format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\" --config package.json",
@@ -77,19 +77,16 @@
   "files": [
     "dist"
   ],
-  "styles": "./dist/nitro.css",
-  "main": "./dist/nitro-ui.umd.js",
-  "module": "./dist/nitro-ui.es.js",
+  "styles": "./dist/nitro-sequence-viewers.css",
+  "module": "./dist/nitro-sequence-viewers.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/nitro-ui.es.js",
-      "require": "./dist/nitro-ui.umd.js",
+      "import": "./dist/nitro-sequence-viewers.es.js",
       "types": "./dist/index.d.ts"
     },
     "./dist/nitro.css": {
-      "import": "./dist/nitro.css",
-      "require": "./dist/nitro.css"
+      "import": "./dist/nitro.css"
     }
   },
   "description": "collection of ui components",

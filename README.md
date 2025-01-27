@@ -1,6 +1,6 @@
 # Nitro Bio Sequence Viewers
 
-![CI](https://github.com/nitro-bio/nitro-ui/actions/workflows/main.yml/badge.svg)
+![CI](https://github.com/nitro-bio/sequence-viewers/actions/workflows/main.yml/badge.svg)
 
 ## React Components for visualizing linear and circular DNA
 

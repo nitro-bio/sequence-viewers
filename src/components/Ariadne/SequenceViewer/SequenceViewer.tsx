@@ -21,6 +21,7 @@ import {
   SelectTrigger,
 } from "@ui/select";
 import { CopyButton } from "@ui/copy-button";
+import { binNumbers } from "@utils/mathUtils";
 
 export const SequenceViewer = ({
   sequences,
@@ -28,12 +29,14 @@ export const SequenceViewer = ({
   selection,
   setSelection,
   containerClassName,
+  sparkLineData,
   charClassName,
   selectionClassName,
   hideMetadataBar,
   noValidate,
 }: {
   sequences: string[];
+  sparkLineData?: (number | null | undefined)[];
   annotations: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection | null) => void;
@@ -71,6 +74,24 @@ export const SequenceViewer = ({
     },
     [sequences, stackedAnnotations],
   );
+  const sparklineSequence = useMemo(() => {
+    if (!sparkLineData) {
+      return null;
+    }
+    const binnedData = binNumbers(sparkLineData, 8);
+    const lines = "▁▂▃▄▅▆▇█";
+    return binnedData.map((count, i) => {
+      return {
+        base: lines[count],
+        annotations: [],
+        index: i,
+      };
+    });
+  }, [sparkLineData]);
+  if (sparklineSequence) {
+    annotatedSequences.push(sparklineSequence);
+  }
+
   useEffect(
     function mountCopyHandler() {
       const copyHandler = (e: ClipboardEvent) => {

@@ -172,3 +172,63 @@ export const SequenceViewerDarkMode = () => {
 export const HideMetadataBar = () => {
   return <SequenceStory numSequences={1} hideMetadataBar />;
 };
+
+export const WithSparklineAnnotation = () => {
+  const { sequences } = useMemo(
+    () =>
+      generateRandomAlignedSequences({
+        maxSequences: 1,
+        maxLength: 1000,
+      }),
+    [],
+  );
+
+  const charClassName = ({ sequenceIdx }: { sequenceIdx: number }) => {
+    if (sequenceIdx === 0) {
+      return "dark:text-brand-300 text-brand-600";
+    } else if (sequenceIdx === 1) {
+      return "dark:text-indigo-300 text-indigo-600";
+    } else if (sequenceIdx === 2) {
+      return "dark:text-amber-300 text-amber-600";
+    } else {
+      return "dark:text-noir-300 text-noir-600";
+    }
+  };
+  return (
+    <div className="grid min-h-screen content-center py-8">
+      <div className="max-w-4xl">
+        <SequenceViewer
+          selectionClassName="bg-brand-400/20"
+          sparkLineData={[
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            undefined,
+            8,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            undefined,
+            8,
+          ]}
+          sequences={["FAIL SEQUENCE"]}
+          annotations={[]}
+          selection={null}
+          charClassName={charClassName}
+          noValidate
+          setSelection={() => {}}
+        />
+      </div>
+    </div>
+  );
+};

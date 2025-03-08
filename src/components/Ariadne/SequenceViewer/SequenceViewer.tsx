@@ -71,6 +71,30 @@ export const SequenceViewer = ({
     },
     [sequences, stackedAnnotations],
   );
+  useEffect(
+    function mountCopyHandler() {
+      const copyHandler = (e: ClipboardEvent) => {
+        if (!selection) {
+          return;
+        }
+        const stringToCopy = getStringToCopy(
+          annotatedSequences,
+          selection,
+          seqIdxToCopy,
+        );
+        if (!stringToCopy) {
+          return;
+        }
+        e.clipboardData?.setData("text/plain", stringToCopy);
+        e.preventDefault();
+      };
+      document.addEventListener("copy", copyHandler);
+      return function unmountCopyHandler() {
+        document.removeEventListener("copy", copyHandler);
+      };
+    },
+    [annotatedSequences, selection, seqIdxToCopy],
+  );
 
   const memoizedSeqContent = useMemo(() => {
     return (
@@ -470,39 +494,6 @@ export const CopyDisplay = ({
   }) => string;
   className?: string;
 }) => {
-  const getStringToCopy = () => {
-    if (!selection) {
-      return;
-    }
-    const seq = annotatedSequences[seqIdxToCopy];
-    const stringToCopy = seq
-      .filter((base) =>
-        baseInSelection({
-          baseIndex: base.index,
-          selection: selection,
-          sequenceLength: annotatedSequences[seqIdxToCopy].length,
-        }),
-      )
-      .map((base) => base.base)
-      .join("");
-    return stringToCopy;
-  };
-  useEffect(function mountCopyHandler() {
-    const copyHandler = (e: ClipboardEvent) => {
-      const stringToCopy = getStringToCopy();
-      if (!stringToCopy) {
-        return;
-      }
-      e.clipboardData?.setData("text/plain", stringToCopy);
-      alert("Copied to clipboard!");
-      e.preventDefault();
-    };
-    document.addEventListener("copy", copyHandler);
-    return function unmountCopyHandler() {
-      document.removeEventListener("copy", copyHandler);
-    };
-  }, []);
-
   return (
     <span className="flex">
       <Select
@@ -535,10 +526,34 @@ export const CopyDisplay = ({
         </SelectContent>
       </Select>
       <CopyButton
-        textToCopy={() => getStringToCopy() ?? ""}
+        textToCopy={() => {
+          if (!selection) {
+            return "";
+          }
+          return getStringToCopy(annotatedSequences, selection, seqIdxToCopy);
+        }}
         label={""}
         disabled={!selection}
       />
     </span>
   );
+};
+
+const getStringToCopy = (
+  annotatedSequences: AnnotatedBase[][],
+  selection: AriadneSelection,
+  seqIdxToCopy: number,
+) => {
+  const seq = annotatedSequences[seqIdxToCopy];
+  const stringToCopy = seq
+    .filter((base) =>
+      baseInSelection({
+        baseIndex: base.index,
+        selection: selection,
+        sequenceLength: annotatedSequences[seqIdxToCopy].length,
+      }),
+    )
+    .map((base) => base.base)
+    .join("");
+  return stringToCopy;
 };

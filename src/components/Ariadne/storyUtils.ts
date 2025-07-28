@@ -2,17 +2,18 @@ import { getRndInteger } from "../../utils/mathUtils";
 import { Annotation } from "./types";
 
 const annotationTypes = [
-  "CDS",
-  "enhancer",
-  "intron",
-  "misc_feature",
-  "polyA_signal",
-  "promoter",
-  "protein_bind",
-  "rep_origin",
-  "LTR",
-  "source",
-  "insertion",
+  // "CDS",
+  // "enhancer",
+  // "intron",
+  // "misc_feature",
+  // "polyA_signal",
+  // "promoter",
+  // "protein_bind",
+  // "rep_origin",
+  // "LTR",
+  // "source",
+  // "insertion",
+  "REALLY_LONG_ANNOTATION_NAME_TO_TEST_TRUNCATION",
 ];
 const classNames = [
   "cursor-pointer text-white truncate opacity-50 group-hover:opacity-100 hover:opacity-100 bg-red-600 fill-red-600 stroke-red-600",
@@ -128,23 +129,23 @@ export const classNamesBySequenceIdx = ({
 }) => {
   if (sequenceIdx === 0) {
     return {
-      charClassName: "dark:text-brand-300 text-brand-600",
+      charClassName: "text-sequences-primary",
       selectionClassName: "bg-brand-400/20",
     };
   } else if (sequenceIdx === 1) {
     return {
-      charClassName: "dark:text-indigo-300 text-indigo-600",
+      charClassName: "text-indigo-600",
       selectionClassName: "bg-indigo-400/20",
     };
   } else if (sequenceIdx === 2) {
     return {
-      charClassName: "dark:text-amber-300 text-amber-600",
+      charClassName: "text-amber-600",
       selectionClassName: "bg-amber-400/20",
     };
   } else {
     return {
-      charClassName: "dark:text-noir-300 text-noir-600",
-      selectionClassName: "bg-noir-400/20",
+      charClassName: "text-sequences-secondary text-red-600",
+      selectionClassName: "",
     };
   }
 };

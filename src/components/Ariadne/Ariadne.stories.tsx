@@ -9,6 +9,7 @@ import {
   generateRandomAlignedSequences,
 } from "./storyUtils";
 import { AriadneSelection } from "./types";
+import { classNames } from "@utils/stringUtils";
 
 export default {
   title: "Ariadne/Ariadne",
@@ -33,8 +34,8 @@ const AriadneStory = ({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 bg-white lg:h-screen lg:grid-cols-2 dark:bg-noir-800 ">
-      <div className="h-full overflow-y-scroll border-b border-noir-600 lg:border-r lg:pr-8">
+    <div className="grid grid-cols-1 gap-4 lg:h-screen lg:grid-cols-2">
+      <div className="h-full overflow-y-scroll border-b lg:border-r lg:pr-8">
         <SequenceViewer
           sequences={sequences}
           selection={selection}
@@ -52,9 +53,9 @@ const AriadneStory = ({
         {sequences.map((sequence, idx) => (
           <CircularViewer
             key={idx}
-            containerClassName={
-              classNamesBySequenceIdx({ sequenceIdx: idx }).charClassName
-            }
+            containerClassName={classNames(
+              classNamesBySequenceIdx({ sequenceIdx: idx }).charClassName,
+            )}
             sequence={sequence}
             annotations={annotations}
             selection={selection}

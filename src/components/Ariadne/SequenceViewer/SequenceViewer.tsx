@@ -122,7 +122,7 @@ export const SequenceViewer = ({
           <SeqMetadataBar
             hoveredPosition={hoveredPosition}
             activeAnnotation={activeAnnotation}
-            className="sticky inset-x-0 top-0 z-[3] w-full px-2 py-1 backdrop-blur-md"
+            className="sticky inset-x-0 top-0 z-3 w-full px-2 py-1 backdrop-blur-md"
             annotatedSequences={annotatedSequences}
             charClassName={charClassName}
             seqIdxToCopy={seqIdxToCopy}
@@ -176,15 +176,13 @@ export const SeqContent = ({
     }
     return classNames(
       "text-xs z-1",
-      // don't allow selection of indices
-      "dark:group-hover:text-noir-300 group-hover:text-noir-800",
       baseInSelection({
         baseIndex: base.index,
         selection,
         sequenceLength: annotatedSequences[sequenceIdx].length,
       })
-        ? "text-brand-700 dark:text-brand-300"
-        : "text-noir-400 dark:text-noir-600",
+        ? "text-sequences-primary group-hover:text-sequences-primary-muted"
+        : "text-sequences-foreground group-hover:text-sequences-primary",
     );
   };
   const handleMouseUp = () => {
@@ -209,7 +207,6 @@ export const SeqContent = ({
           <div
             className={classNames(
               "relative mt-4 flex flex-col justify-between",
-              "group hover:bg-noir-200 dark:hover:bg-noir-600",
             )}
             key={`base-${baseIdx}`}
           >
@@ -222,7 +219,7 @@ export const SeqContent = ({
                 return (
                   <div
                     key={`sequence-${sequenceIdx}-base-${baseIdx}`}
-                    className={classNames("whitespace-pre text-center")}
+                    className={classNames("text-center whitespace-nowrap")}
                     onMouseEnter={() => {
                       setHoveredPosition(base.index);
                       // if mouse is down, update selection
@@ -249,7 +246,7 @@ export const SeqContent = ({
                       index={baseIdx}
                       charClassName={classNames(
                         "absolute -top-4 left-0",
-                        "group-hover:text-brand-200 border-b border-noir-600 group-hover:border-noir-300",
+                        "border-b",
                         indicesClassName({
                           base,
                           sequenceIdx,
@@ -271,7 +268,10 @@ export const SeqContent = ({
                             annotatedSequences[sequenceIdx].length,
                         }) &&
                           base.base !== " " &&
-                          selectionClassName,
+                          classNames(
+                            "bg-sequences-selection/20",
+                            selectionClassName,
+                          ),
                       )}
                     />
                   </div>
@@ -326,8 +326,8 @@ export const SeqMetadataBar = ({
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
-        "flex gap-1 rounded-full px-2 py-px text-xs !opacity-100",
-        "ml-auto",
+        "flex gap-1 rounded-full px-2 py-px text-xs opacity-100!",
+        "ml-2 truncate",
         activeAnnotation.className,
       )}
     >
@@ -352,7 +352,7 @@ export const SeqMetadataBar = ({
     </span>
   ) : null;
   const positionDisplay = (
-    <span className="min-w-16 text-xs text-black dark:text-white">
+    <span className="text-sequences-foreground min-w-16 text-xs">
       Pos: {hoveredPosition ?? 0}
     </span>
   );
@@ -420,7 +420,7 @@ export const SequenceAnnotation = ({
             return (
               <div
                 key={`annotation-${index}-${i}`}
-                className={"h-3 border-b-2 border-noir-100 opacity-10 "}
+                className={"h-3 border-b-2 opacity-10"}
               />
             );
           }
@@ -495,22 +495,23 @@ export const CopyDisplay = ({
   className?: string;
 }) => {
   return (
-    <span className="flex">
+    <span className="flex items-center gap-2">
       <Select
         value={seqIdxToCopy.toString()}
         onValueChange={(value) => setSeqIdxToCopy(parseInt(value))}
       >
-        <SelectTrigger className="w-fit">
-          <SelectValue
-            className={charClassName({
+        <SelectTrigger
+          className={classNames(
+            charClassName({
               base: { base: "A", annotations: [], index: 0 },
               sequenceIdx: seqIdxToCopy,
-            })}
-          >
-            Sequence {seqIdxToCopy + 1}
-          </SelectValue>
+            }),
+            "text-sequences-foreground w-fit",
+          )}
+        >
+          <SelectValue>Sequence {seqIdxToCopy + 1}</SelectValue>
         </SelectTrigger>
-        <SelectContent className="bg-white dark:bg-black">
+        <SelectContent className="text-sequences-foreground bg-sequences-background">
           {annotatedSequences.map((_, idx) => (
             <SelectItem
               key={`sequence-${idx}`}

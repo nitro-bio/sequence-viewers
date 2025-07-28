@@ -43,13 +43,13 @@ const SequenceStory = ({
 
   const defaultCharClassName = ({ sequenceIdx }: { sequenceIdx: number }) => {
     if (sequenceIdx === 0) {
-      return "dark:text-brand-300 text-brand-600";
+      return "text-sequences-primary";
     } else if (sequenceIdx === 1) {
       return "dark:text-indigo-300 text-indigo-600";
     } else if (sequenceIdx === 2) {
       return "dark:text-amber-300 text-amber-600";
     } else {
-      return "dark:text-noir-300 text-noir-600";
+      return "";
     }
   };
 
@@ -57,7 +57,6 @@ const SequenceStory = ({
     <div className="grid min-h-screen content-center py-8">
       <div className="max-w-4xl">
         <SequenceViewer
-          selectionClassName="bg-brand-400/20"
           sequences={sequences}
           annotations={annotations}
           selection={selection}
@@ -108,10 +107,7 @@ export const SequenceViewerStoryReverseSelectionOverSeam = () => (
 );
 
 export const SequenceViewerStoryCustomClassNames = () => (
-  <SequenceStory
-    numSequences={1}
-    containerClassName="text-xl bg-noir-800 skew-y-3"
-  />
+  <SequenceStory numSequences={1} containerClassName="text-xl skew-y-3" />
 );
 
 export const SequenceViewerStorySecondSequence = () => (
@@ -128,13 +124,13 @@ export const SequenceViewerStorySecondSequence = () => (
 export const SequenceViewerInvalid = () => {
   const charClassName = ({ sequenceIdx }: { sequenceIdx: number }) => {
     if (sequenceIdx === 0) {
-      return "dark:text-brand-300 text-brand-600";
+      return "";
     } else if (sequenceIdx === 1) {
       return "dark:text-indigo-300 text-indigo-600";
     } else if (sequenceIdx === 2) {
       return "dark:text-amber-300 text-amber-600";
     } else {
-      return "dark:text-noir-300 text-noir-600";
+      return "dark:text-zinc-300 text-zinc-600";
     }
   };
 
@@ -163,7 +159,7 @@ export const SequenceViewerDarkMode = () => {
     };
   }, []);
   return (
-    <div className="bg-noir-800 ">
+    <div className="">
       <SequenceStory numSequences={3} />;
     </div>
   );

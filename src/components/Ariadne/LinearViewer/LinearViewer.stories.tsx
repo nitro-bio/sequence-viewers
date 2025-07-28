@@ -12,7 +12,7 @@ export default {
 
 const classNameBySequenceIdx = ({ sequenceIdx }: { sequenceIdx: number }) => {
   if (sequenceIdx === 0) {
-    return "dark:text-brand-300 text-brand-600";
+    return "";
   } else if (sequenceIdx === 1) {
     return "dark:text-indigo-300 text-indigo-600";
   } else if (sequenceIdx === 2) {
@@ -49,13 +49,11 @@ const LinearStory = ({
   return (
     <div className="w-full max-w-3xl px-8">
       <LinearViewer
-        containerClassName="text-brand-400 "
         sequences={sequences}
         annotations={annotations}
         selection={selection}
         setSelection={setSelection}
         selectionClassName={selectionClassName}
-        sequenceClassName={classNameBySequenceIdx}
       />
     </div>
   );
@@ -211,7 +209,6 @@ export const LinearViewerStoryStackAnnotationsByType = () => {
         annotations={annotations}
         selection={selection}
         setSelection={setSelection}
-        sequenceClassName={classNameBySequenceIdx}
         stackingFn={stackAnnsByType}
       />
     </div>

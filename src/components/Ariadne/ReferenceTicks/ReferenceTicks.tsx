@@ -19,8 +19,8 @@ export const ReferenceTicks = ({
           >
             <div
               className={classNames(
-                "font-mono ",
-                "absolute bottom-0 left-0 right-0",
+                "font-mono",
+                "absolute right-0 bottom-0 left-0",
 
                 showTicks ? "opacity-100" : "opacity-0",
                 nucl.base === "G" && "text-red-500",

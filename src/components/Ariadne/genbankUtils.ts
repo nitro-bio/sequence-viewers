@@ -71,7 +71,7 @@ export const genbankFeaturesToAnnotations = ({
 
 export function getClassNameFromFeatureType(annType: AnnotationType): string {
   const common =
-    "cursor-pointer opacity-60 group-hover:opacity-100 !text-xs hover:opacity-100 pointer-events-all text-white text-clip overflow-hidden whitespace-nowrap";
+    "cursor-pointer opacity-60 group-hover:opacity-100 text-xs! hover:opacity-100 pointer-events-all text-white text-clip overflow-hidden whitespace-nowrap";
   const classNameMap: { [key: AnnotationType]: string } = zipArrays(
     [
       "CDS",

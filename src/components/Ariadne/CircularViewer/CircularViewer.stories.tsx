@@ -38,7 +38,6 @@ const CircularStory = ({
         {sequences.map((seq, idx) => (
           <CircularViewer
             key={idx}
-            containerClassName="text-brand-400"
             sequence={seq}
             annotations={annotations}
             selection={selection}

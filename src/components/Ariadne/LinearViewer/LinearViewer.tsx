@@ -1,15 +1,18 @@
 import { useLinearSelectionRect } from "@Ariadne/hooks/useSelection";
-import { getAnnotatedSequence, getSubsequenceLength } from "@Ariadne/utils";
+import {
+  getAnnotatedSequence,
+  getSubsequenceLength,
+  stackAnnotationsNoOverlap,
+} from "@Ariadne/utils";
 import { classNames } from "@utils/stringUtils";
 import { useEffect, useMemo, useRef } from "react";
 import {
-  AnnotatedSequence,
-  AriadneSelection,
-  Annotation,
   AnnotatedBase,
+  AnnotatedSequence,
+  Annotation,
+  AriadneSelection,
   StackedAnnotation,
 } from "../types";
-import { stackAnnotationsNoOverlap } from "@Ariadne/utils";
 import { LinearAnnotationGutter } from "./LinearAnnotationGutter";
 
 export interface Props {
@@ -20,7 +23,11 @@ export interface Props {
   onDoubleClick?: () => void;
   selectionClassName?: (selection: AriadneSelection) => string;
   containerClassName?: string;
-  sequenceClassName: ({ sequenceIdx }: { sequenceIdx: number }) => string;
+  sequenceClassName?: ({
+    sequenceIdx,
+  }: {
+    sequenceIdx: number;
+  }) => string | string;
   mismatchClassName?: (mismatchedBase: AnnotatedBase) => string;
   stackingFn?: (annotations: Annotation[]) => StackedAnnotation[];
 }
@@ -73,11 +80,29 @@ export const LinearViewer = (props: Props) => {
   const SVG_WIDTH = 500;
   const SVG_HEIGHT = sequences.length * 10 + 10;
 
+  const getSequenceClassNameProp = ({
+    sequenceIdx,
+  }: {
+    sequenceIdx: number;
+  }) => {
+    let userProvided = "";
+    if (typeof sequenceClassName === "function") {
+      userProvided = sequenceClassName({ sequenceIdx });
+    } else if (typeof sequenceClassName === "string") {
+      userProvided = sequenceClassName;
+    }
+    return classNames(
+      userProvided,
+      sequenceIdx == 0 && "text-sequences-primary",
+      sequenceIdx > 0 && "text-sequences-secondary",
+    );
+  };
+
   return (
     <div className={containerClassName || ""}>
       <svg
         ref={selectionRef}
-        className={classNames("select-none font-thin")}
+        className={classNames("font-thin select-none")}
         onDoubleClick={onDoubleClick}
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
         width="100%"
@@ -88,7 +113,7 @@ export const LinearViewer = (props: Props) => {
           {annotatedSequences.map((sequence, i) => (
             <g key={`Sequence-${i}`}>
               <SequenceLine
-                sequenceClassName={sequenceClassName}
+                sequenceClassName={getSequenceClassNameProp({ sequenceIdx: i })}
                 baseSequence={sequence}
                 alignedSequences={annotatedSequences.filter((_, j) => j !== i)}
                 sequenceIdx={i}
@@ -120,7 +145,7 @@ interface SequenceLineProps {
   baseSequence: AnnotatedSequence;
   sequenceIdx: number;
   alignedSequences: AnnotatedSequence[];
-  sequenceClassName: ({ sequenceIdx }: { sequenceIdx: number }) => string;
+  sequenceClassName?: string;
   mismatchClassName?: (mismatchedBase: AnnotatedBase) => string;
 }
 
@@ -172,10 +197,11 @@ const SequenceLine = ({
     };
 
   let lastXPerc = -1;
+
   return (
     <>
       <line
-        className={classNames("", sequenceClassName({ sequenceIdx }))}
+        className={classNames("", sequenceClassName)}
         x1={`${startPerc * 100}%`}
         y1={`${sequenceIdx * 10 + 10}`}
         x2={`${endPerc * 100}%`}
@@ -291,6 +317,7 @@ const LinearSelection = ({
     <g
       className={classNames(
         "fill-current stroke-current",
+        "bg-sequences-selection fill-sequences-selection text-sequences-selection stroke-sequences-selection",
         selectionClassName?.(selection),
       )}
     >

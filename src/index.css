@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme inline {
+  --color-sequences-primary: var(--color-emerald-700);
+  --color-sequences-secondary: var(--color-zinc-600);
+  --color-sequences-selection: var(--color-emerald-600);
+  --color-sequences-foreground: var(--color-zinc-800);
+  --color-sequences-background: var(--color-zinc-50);
+}

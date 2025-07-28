@@ -40,7 +40,7 @@ export const CircularViewer = ({
     cy: svgSizePX / 2,
     sizeX: svgSizePX,
     sizeY: svgSizePX,
-    radius: (svgSizePX - svgPadding) / 2,
+    radius: (svgSizePX - (svgPadding + 2)) / 2, // padding +2 to account for stroke width
   };
   const stackedAnnotations = stackAnnsByType(annotations);
   const annotatedSequence = useMemo(
@@ -65,7 +65,7 @@ export const CircularViewer = ({
   return (
     <div
       className={classNames(
-        "flex select-none items-center justify-center font-thin",
+        "text-sequences-primary flex items-center justify-center font-thin select-none",
         containerClassName,
       )}
     >

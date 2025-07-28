@@ -4,6 +4,7 @@ import path from "path";
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import alias from "@rollup/plugin-alias";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
@@ -11,6 +12,7 @@ export default defineConfig({
       insertTypesEntry: true,
     }),
     react(),
+    tailwindcss(),
     alias({
       entries: [
         {

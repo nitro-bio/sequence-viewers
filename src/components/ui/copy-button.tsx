@@ -20,10 +20,10 @@ export const CopyButton = ({
   );
   const [internalLabel, setInternalLabel] = useState<ReactNode>(label);
   const onClipboardCopy = () => {
-    setLogo(<CheckIcon className={cn("h-3 w-3", logoClassName)} />);
+    setLogo(<CheckIcon className={cn("size-3", logoClassName)} />);
     setInternalLabel("Copied!");
     setTimeout(() => {
-      setLogo(<CopyIcon className={cn("h-3 w-3", logoClassName)} />);
+      setLogo(<CopyIcon className={cn("size-3", logoClassName)} />);
       setInternalLabel(label);
     }, 1000);
   };
@@ -32,7 +32,7 @@ export const CopyButton = ({
       aria-label="Copy to clipboard"
       disabled={disabled}
       className={cn(
-        "flex items-center gap-2 disabled:cursor-not-allowed disabled:text-noir-400 dark:text-noir-100 dark:disabled:text-zinc-600",
+        "flex items-center gap-2 disabled:cursor-not-allowed disabled:dark:dark:disabled:text-zinc-600",
         buttonClassName,
       )}
       onClick={() => {

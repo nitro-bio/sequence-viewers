@@ -1,17 +1,29 @@
 # Nitro Bio Sequence Viewers
 
+![Sequence Viewer](./docs/images/sequence-viewer-header.png)
+
 ![CI](https://github.com/nitro-bio/sequence-viewers/actions/workflows/main.yml/badge.svg)
 
-## React Components for visualizing linear and circular DNA
+## As seen on
 
-[Documentation](https://docs.nitro.bio)
-[Quickstart](https://docs.nitro.bio/quickstart)
+- [NVIDIA's Build](https://build.nvidia.com/arc/evo2-40b): playground for ai models
+- [Tatta Bio's Gaia](https://gaia.tatta.bio/): embedding based protein search engine
+- [EvoScale's Forge](https://forge.evolutionaryscale.ai/): playground for ESM models
+- [Nitro Bio's Sequences](https://sequences.nitro.bio/): prompt builder for protein models
+
+## React Components for visualizing linear and circular sequences
 
 ### Sequence Viewer
 
+[Documentation](https://docs.nitro.bio/SequenceViewer/)
+
 ### Circular Viewer
 
+[Documentation](https://docs.nitro.bio/CircularViewer/)
+
 ### Linear Viewer
+
+[Documentation](https://docs.nitro.bio/LinearViewer/)
 
 ## Development
 

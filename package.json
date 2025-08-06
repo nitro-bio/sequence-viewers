@@ -1,7 +1,7 @@
 {
   "name": "@nitro-bio/sequence-viewers",
   "private": false,
-  "version": "1.2.6",
+  "version": "1.2.7",
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",

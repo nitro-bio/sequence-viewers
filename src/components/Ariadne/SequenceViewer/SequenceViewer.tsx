@@ -200,9 +200,13 @@ export const SeqContent = ({
     };
   }, []);
 
+  const maxSequenceLength = Math.max(
+    ...annotatedSequences.map((seq) => seq.length),
+  );
+
   return (
     <>
-      {annotatedSequences[0].map(({ index: baseIdx }) => {
+      {Array.from({ length: maxSequenceLength }, (_, baseIdx) => {
         return (
           <div
             className={classNames(
@@ -287,9 +291,7 @@ export const SeqContent = ({
               )}
               setHoveredPosition={setHoveredPosition}
               setActiveAnnotation={setActiveAnnotation}
-              maxSequenceLength={Math.max(
-                ...annotatedSequences.map((seq) => seq.length),
-              )}
+              maxSequenceLength={maxSequenceLength}
             />
           </div>
         );

@@ -105,7 +105,7 @@ export const generateRandomAlignedSequences = ({
     const endIdx = getRndInteger(startIdx * 1.1, baseSequence.length);
     const sequence = Array.from({ length: baseSequence.length }, (_, j) => {
       if (j < startIdx || j > endIdx) {
-        return " "; // pad subsequence to make it same length as baseSequence
+        return ""; // pad subsequence to make it same length as baseSequence
       }
       if (getRndInteger(0, 100) < 10) {
         const basesPlusDeletion = ["A", "C", "G", "T", "-"];

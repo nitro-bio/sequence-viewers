@@ -4,6 +4,7 @@ import {
   stackAnnotationsNoOverlap,
 } from "@Ariadne/utils";
 import { classNames } from "@utils/stringUtils";
+import { useMafftEinsi } from "../hooks/useMafftEinsi";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -21,9 +22,11 @@ import {
   SelectTrigger,
 } from "@ui/select";
 import { CopyButton } from "@ui/copy-button";
+import { Button } from "@ui/button/button";
 
 export const SequenceViewer = ({
   sequences,
+  setSequences,
   annotations,
   selection,
   setSelection,
@@ -32,8 +35,10 @@ export const SequenceViewer = ({
   selectionClassName,
   hideMetadataBar,
   noValidate,
+  highlightMisalignments,
 }: {
   sequences: string[];
+  setSequences?: (sequences: string[]) => void;
   annotations: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection | null) => void;
@@ -48,12 +53,14 @@ export const SequenceViewer = ({
   selectionClassName?: string;
   hideMetadataBar?: boolean;
   noValidate?: boolean;
+  highlightMisalignments?: boolean;
 }) => {
   const [hoveredPosition, setHoveredPosition] = useState<number | null>(null);
   const [seqIdxToCopy, setSeqIdxToCopy] = useState<number>(0);
   const [activeAnnotation, setActiveAnnotation] = useState<Annotation | null>(
     null,
   );
+  const { state: alignState, run: runAlignment } = useMafftEinsi();
   const stackedAnnotations = useMemo(
     function memoize() {
       return stackAnnotationsNoOverlap(
@@ -107,9 +114,15 @@ export const SequenceViewer = ({
         stackedAnnotations={stackedAnnotations}
         charClassName={charClassName}
         selectionClassName={selectionClassName}
+        highlightMisalignments={highlightMisalignments}
       />
     );
-  }, [annotatedSequences, selection, stackedAnnotations]);
+  }, [
+    annotatedSequences,
+    selection,
+    stackedAnnotations,
+    highlightMisalignments,
+  ]);
   return (
     <>
       <div
@@ -128,6 +141,16 @@ export const SequenceViewer = ({
             seqIdxToCopy={seqIdxToCopy}
             setSeqIdxToCopy={setSeqIdxToCopy}
             selection={selection}
+            onAlign={async () => {
+              if (!setSequences) return;
+              const fasta = sequences
+                .map((seq, idx) => `>Sequence_${idx + 1}\n${seq}`)
+                .join("\n");
+
+              await runAlignment(fasta);
+            }}
+            alignState={alignState}
+            setSequences={setSequences}
           />
         )}
         <div className="flex flex-wrap px-2">{memoizedSeqContent}</div>
@@ -144,6 +167,7 @@ export const SeqContent = ({
   stackedAnnotations,
   charClassName,
   selectionClassName,
+  highlightMisalignments,
 }: {
   annotatedSequences: AnnotatedBase[][];
   selection: AriadneSelection | null;
@@ -159,6 +183,7 @@ export const SeqContent = ({
     sequenceIdx: number;
   }) => string;
   selectionClassName?: string;
+  highlightMisalignments?: boolean;
 }) => {
   const mouseDown = useRef(false);
   const indicesClassName = ({
@@ -220,6 +245,20 @@ export const SeqContent = ({
                   (base: AnnotatedBase) => base.index === baseIdx,
                 ) || { base: " ", annotations: [], index: baseIdx };
 
+                // Check for misalignment with first sequence
+                const firstSeqBase = annotatedSequences[0]?.find(
+                  (b: AnnotatedBase) => b.index === baseIdx,
+                );
+                const isMisaligned =
+                  highlightMisalignments &&
+                  sequenceIdx > 0 &&
+                  firstSeqBase &&
+                  base.base !== " " &&
+                  firstSeqBase.base !== " " &&
+                  base.base !== "-" &&
+                  firstSeqBase.base !== "-" &&
+                  base.base !== firstSeqBase.base;
+
                 return (
                   <div
                     key={`sequence-${sequenceIdx}-base-${baseIdx}`}
@@ -265,6 +304,8 @@ export const SeqContent = ({
                           base,
                           sequenceIdx,
                         }),
+                        isMisaligned && "!text-sequences-mismatch",
+                        ["-", " "].includes(base.base) && "!text-sequences-gap",
                         baseInSelection({
                           baseIndex: baseIdx,
                           selection,
@@ -309,6 +350,9 @@ export const SeqMetadataBar = ({
   setSeqIdxToCopy,
   selection,
   className,
+  onAlign,
+  alignState,
+  setSequences,
 }: {
   hoveredPosition: number | null;
   activeAnnotation: Annotation | null;
@@ -324,7 +368,40 @@ export const SeqMetadataBar = ({
     sequenceIdx: number;
   }) => string;
   className?: string;
+  onAlign: () => Promise<void>;
+  alignState?: {
+    status: "idle" | "running" | "done" | "error";
+    output?: string;
+    error?: unknown;
+  };
+  setSequences?: (sequences: string[]) => void;
 }) => {
+  useEffect(() => {
+    if (alignState?.status === "done" && alignState.output && setSequences) {
+      // Parse the aligned FASTA output
+      const lines = alignState.output.split("\n");
+      const alignedSequences: string[] = [];
+      let currentSeq = "";
+
+      for (const line of lines) {
+        if (line.startsWith(">")) {
+          if (currentSeq) {
+            alignedSequences.push(currentSeq);
+            currentSeq = "";
+          }
+        } else {
+          currentSeq += line.trim();
+        }
+      }
+      if (currentSeq) {
+        alignedSequences.push(currentSeq);
+      }
+
+      if (alignedSequences.length > 0) {
+        setSequences(alignedSequences.map((x) => x.toUpperCase()));
+      }
+    }
+  }, [alignState, setSequences]);
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
@@ -361,11 +438,27 @@ export const SeqMetadataBar = ({
   return (
     <div
       className={classNames(
-        "flex h-8 items-center gap-1 py-1 text-xs",
+        "flex h-8 items-center gap-2 py-1 text-xs",
         className,
       )}
     >
-      {positionDisplay}
+      {setSequences && (
+        <Button
+          onClick={onAlign}
+          size="xs"
+          disabled={alignState?.status === "running"}
+          className={classNames(
+            "bg-sequences-foreground/10 hover:bg-sequences-foreground/30 text-sequences-foreground",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            "transition-colors",
+          )}
+        >
+          Align
+        </Button>
+      )}
+      {alignState?.status === "error" && (
+        <span className="ml-2 text-xs text-red-500">Alignment failed</span>
+      )}
       <CopyDisplay
         annotatedSequences={annotatedSequences}
         charClassName={charClassName}
@@ -373,6 +466,7 @@ export const SeqMetadataBar = ({
         setSeqIdxToCopy={setSeqIdxToCopy}
         selection={selection}
       />
+      {positionDisplay}
       {annotationDisplay}
     </div>
   );
@@ -497,7 +591,7 @@ export const CopyDisplay = ({
   className?: string;
 }) => {
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-2 px-1 py-px">
       <Select
         value={seqIdxToCopy.toString()}
         onValueChange={(value) => setSeqIdxToCopy(parseInt(value))}
@@ -508,7 +602,7 @@ export const CopyDisplay = ({
               base: { base: "A", annotations: [], index: 0 },
               sequenceIdx: seqIdxToCopy,
             }),
-            "text-sequences-foreground w-fit",
+            "text-sequences-foreground w-fit rounded-none border-r",
           )}
         >
           <SelectValue>Sequence {seqIdxToCopy + 1}</SelectValue>
@@ -537,6 +631,10 @@ export const CopyDisplay = ({
         }}
         label={""}
         disabled={!selection}
+        buttonClassName={charClassName({
+          base: { base: "A", annotations: [], index: 0 },
+          sequenceIdx: seqIdxToCopy,
+        })}
       />
     </span>
   );

@@ -1,6 +1,6 @@
 import { generateRandomAlignedSequences } from "@Ariadne/storyUtils";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { SequenceViewer } from ".";
 import type { AnnotatedBase, AriadneSelection } from "../types";
@@ -147,20 +147,6 @@ export const SequenceViewerInvalid = () => {
           setSelection={() => {}}
         />
       </div>
-    </div>
-  );
-};
-export const SequenceViewerDarkMode = () => {
-  // add "dark" className to body
-  useEffect(function addDarkModeClass() {
-    document.body.classList.add("dark");
-    return function removeDarkModeClass() {
-      document.body.classList.remove("dark");
-    };
-  }, []);
-  return (
-    <div className="">
-      <SequenceStory numSequences={3} />;
     </div>
   );
 };

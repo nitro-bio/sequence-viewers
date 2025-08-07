@@ -31,8 +31,8 @@ export default defineConfig({
     }),
   ],
   build: {
-    sourcemap: "inline",
-    minify: false,
+    sourcemap: true,
+    minify: "terser",
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
       name: "Nitro UI",
@@ -40,14 +40,29 @@ export default defineConfig({
       fileName: (format) => `nitro-sequence-viewers.${format}.js`,
     },
     rollupOptions: {
-      external: ["react", "react-dom", "styled-components"],
+      external: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "styled-components",
+      ],
       output: {
         globals: {
           react: "React",
           "react-dom": "ReactDOM",
           "styled-components": "styled",
+          "@biowasm/aioli": "Aioli",
         },
         interop: "compat",
+      },
+    },
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+      format: {
+        comments: false,
       },
     },
   },

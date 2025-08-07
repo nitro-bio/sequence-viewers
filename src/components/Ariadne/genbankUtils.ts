@@ -10,7 +10,7 @@ export const GenbankFeatureSchema = z.object({
   end: z.number(),
   strand: z.union([z.literal(1), z.literal(-1)]),
   type: annotationTypeSchema,
-  notes: z.record(z.array(z.string())).optional(),
+  notes: z.record(z.string(), z.array(z.string())).optional(),
 });
 export type GenbankFeature = z.infer<typeof GenbankFeatureSchema>;
 

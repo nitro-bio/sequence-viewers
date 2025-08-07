@@ -6,4 +6,6 @@
   --color-sequences-selection: var(--color-emerald-600);
   --color-sequences-foreground: var(--color-zinc-800);
   --color-sequences-background: var(--color-zinc-50);
+  --color-sequences-mismatch: var(--color-red-400);
+  --color-sequences-gap: var(--color-zinc-500);
 }

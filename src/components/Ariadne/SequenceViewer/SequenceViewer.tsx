@@ -1,5 +1,6 @@
 import {
   baseInSelection,
+  downloadAsFasta,
   getAnnotatedSequence,
   stackAnnotationsNoOverlap,
 } from "@Ariadne/utils";
@@ -23,6 +24,7 @@ import {
 } from "@ui/select";
 import { CopyButton } from "@ui/copy-button";
 import { Button } from "@ui/button/button";
+import { DownloadIcon } from "lucide-react";
 
 export const SequenceViewer = ({
   sequences,
@@ -34,6 +36,7 @@ export const SequenceViewer = ({
   charClassName,
   selectionClassName,
   hideMetadataBar,
+  hideDownloadButton,
   noValidate,
   highlightMisalignments,
 }: {
@@ -52,6 +55,7 @@ export const SequenceViewer = ({
   }) => string;
   selectionClassName?: string;
   hideMetadataBar?: boolean;
+  hideDownloadButton?: boolean;
   noValidate?: boolean;
   highlightMisalignments?: boolean;
 }) => {
@@ -141,6 +145,7 @@ export const SequenceViewer = ({
             seqIdxToCopy={seqIdxToCopy}
             setSeqIdxToCopy={setSeqIdxToCopy}
             selection={selection}
+            hideDownloadButton={hideDownloadButton}
             onAlign={async () => {
               if (!setSequences) return;
               const fasta = sequences
@@ -350,6 +355,7 @@ export const SeqMetadataBar = ({
   setSeqIdxToCopy,
   selection,
   className,
+  hideDownloadButton,
   onAlign,
   alignState,
   setSequences,
@@ -368,6 +374,7 @@ export const SeqMetadataBar = ({
     sequenceIdx: number;
   }) => string;
   className?: string;
+  hideDownloadButton?: boolean;
   onAlign: () => Promise<void>;
   alignState?: {
     status: "idle" | "running" | "done" | "error";
@@ -442,6 +449,22 @@ export const SeqMetadataBar = ({
         className,
       )}
     >
+      {!hideDownloadButton && (
+        <Button
+          onClick={() => {
+            downloadAsFasta({ annotatedSequences });
+          }}
+          size="xs"
+          variant="ghost"
+          className={classNames(
+            "hover:bg-sequences-foreground/30 text-sequences-foreground",
+            "transition-colors",
+          )}
+        >
+          <DownloadIcon className="size-3" />
+        </Button>
+      )}
+
       {setSequences && (
         <Button
           onClick={onAlign}

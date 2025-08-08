@@ -538,3 +538,58 @@ export function parseFasta(data: string): FastaRecord[] {
 
   return records;
 }
+
+export const downloadAsFasta = ({
+  annotatedSequences,
+  wrap = 60,
+  filePrefix = "nitro-sequence-viewer",
+  headerFor = (idx: number) => `Sequence_${idx + 1}`,
+}: {
+  annotatedSequences: AnnotatedSequence[];
+  wrap?: number;
+  filePrefix?: string;
+  headerFor?: (idx: number) => string;
+}) => {
+  const NON_ALPHABETIC = /[^A-Za-z*]/g; // keep letters and '*' (stop) only
+
+  const wrapSeq = (s: string, n: number) =>
+    n > 0 ? s.match(new RegExp(`.{1,${n}}`, "g"))?.join("\n") : s;
+
+  const fastaContent =
+    annotatedSequences
+      .map((sequence, idx) => {
+        // 1) build raw string from per-base annotations
+        const raw = sequence.map((b) => b.base ?? "").join("");
+
+        // 2) optionally strip gaps; always strip whitespace
+        const ungapped = raw.replace(/\s/g, "");
+
+        // 3) normalize: uppercase and drop weird chars that sneak in
+        const seqString = ungapped.toUpperCase().replace(NON_ALPHABETIC, "");
+
+        if (!seqString.length) return null; // skip empty sequences
+
+        // 4) sanitize header (no leading '>', no spaces)
+        const header = String(headerFor(idx))
+          .replace(/^>/, "")
+          .replace(/\s+/g, "_");
+
+        // 5) wrap to fixed width (recommended for FASTA)
+        const wrapped = wrapSeq(seqString, wrap);
+
+        return `>${header}\n${wrapped}`;
+      })
+      .filter(Boolean)
+      .join("\n") + "\n"; // final newline is nice to have
+
+  const blob = new Blob([fastaContent], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const date = new Date().toISOString().split("T")[0];
+  link.href = url;
+  link.download = `${filePrefix}_${date}.fasta`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};

@@ -84,8 +84,8 @@
       "import": "./dist/nitro-sequence-viewers.es.js",
       "types": "./dist/index.d.ts"
     },
-    "./dist/nitro.css": {
-      "import": "./dist/nitro.css"
+      "./dist/nitro-sequence-viewers.css": {
+      "import": "./dist/nitro-sequence-viewers.css"
     }
   },
   "description": "collection of ui components",

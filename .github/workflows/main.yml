@@ -17,9 +17,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18.x
+          node-version: 22.x
       - name: Install deps
-        run: npm i -g pnpm && pnpm i
+        run: npm i -g pnpm@11.9.0 && pnpm i --frozen-lockfile
       - name: Run Prettier
         run: pnpm run format
       - name: Run ESLint

@@ -13,6 +13,21 @@
 
 ## React Components for visualizing linear and circular sequences
 
+Requires React and React DOM 18.2+ or 19.x.
+
+```sh
+npm install @nitro-bio/sequence-viewers
+```
+
+Import the stylesheet once in your application entry point:
+
+```ts
+import "@nitro-bio/sequence-viewers/dist/nitro-sequence-viewers.css";
+```
+
+The legacy `@nitro-bio/sequence-viewers/dist/nitro.css` import resolves to the
+same stylesheet for compatibility.
+
 ### Sequence Viewer
 
 [Documentation](https://docs.nitro.bio/SequenceViewer/)

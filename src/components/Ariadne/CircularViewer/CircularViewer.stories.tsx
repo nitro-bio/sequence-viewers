@@ -29,7 +29,7 @@ const CircularStory = ({
         maxLength: maxLength ?? 1000,
         annotationOnClick: setSelection,
       }),
-    [],
+    [maxLength, numSequences, setSelection],
   );
 
   return (

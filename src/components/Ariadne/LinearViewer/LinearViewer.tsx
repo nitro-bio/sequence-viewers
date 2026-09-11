@@ -21,6 +21,8 @@ import {
   validateViewerInput,
   type ValidationMode,
 } from "../validation";
+import { clampSlice } from "../CircularViewer/circularUtils";
+import { getMaxSequenceLength } from "../viewerUtils";
 
 export interface Props {
   sequences: string[];
@@ -71,6 +73,7 @@ export const LinearViewer = (props: Props) => {
     [annotationsInput, noValidate, sequences, validationMode],
   );
   const validatedSequences = validation.sequences;
+  const maxSequenceLength = getMaxSequenceLength(validatedSequences);
   const validatedAnnotations = validation.annotations;
 
   const stackedAnnotations = useMemo(
@@ -82,15 +85,12 @@ export const LinearViewer = (props: Props) => {
       // stacks annotations to prevent overlap.
       return stackingFn
         ? stackingFn(validatedAnnotations)
-        : stackAnnotationsNoOverlap(
-            validatedAnnotations,
-            Math.max(...validatedSequences.map((seq) => seq.length)),
-          );
+        : stackAnnotationsNoOverlap(validatedAnnotations, maxSequenceLength);
     },
     [
       stackingFn,
       validatedAnnotations,
-      validatedSequences,
+      maxSequenceLength,
       validation.hasUnsafeSequenceData,
     ],
   );
@@ -105,6 +105,17 @@ export const LinearViewer = (props: Props) => {
   );
 
   const baseSequence = annotatedSequences[0];
+  const hasSequenceData = annotatedSequences.some(
+    (annotatedSequence) => annotatedSequence.length > 0,
+  );
+  const displayedSelection =
+    maxSequenceLength === 0
+      ? null
+      : clampSlice({
+          slice: selection,
+          firstIdx: 0,
+          lastIdx: maxSequenceLength - 1,
+        });
   const selectionRef = useRef<SVGSVGElement>(null);
 
   // const numberOfTicks = 5;
@@ -139,6 +150,16 @@ export const LinearViewer = (props: Props) => {
       />
     );
   }
+  if (!hasSequenceData) {
+    return (
+      <div
+        className={classNames("nsv-root", containerClassName)}
+        data-empty="true"
+      >
+        <ViewerValidationMessages diagnostics={validation.diagnostics} />
+      </div>
+    );
+  }
 
   return (
     <div className={classNames("nsv-root", containerClassName)}>
@@ -165,15 +186,17 @@ export const LinearViewer = (props: Props) => {
             </g>
           ))}
         </g>
-        <LinearSelection
-          selectionClassName={selectionClassName}
-          selectionRef={selectionRef}
-          selection={selection}
-          setSelection={setSelection}
-          sequence={baseSequence}
-        />
+        {baseSequence?.length > 0 && (
+          <LinearSelection
+            selectionClassName={selectionClassName}
+            selectionRef={selectionRef}
+            selection={displayedSelection}
+            setSelection={setSelection}
+            sequence={baseSequence}
+          />
+        )}
       </svg>
-      {stackedAnnotations.length > 0 && (
+      {stackedAnnotations.length > 0 && baseSequence?.length > 0 && (
         <LinearAnnotationGutter
           containerClassName=""
           stackedAnnotations={stackedAnnotations}
@@ -201,20 +224,18 @@ const SequenceLine = ({
 }: SequenceLineProps) => {
   const start = baseSequence[0]?.index;
   if (start === undefined) {
-    throw new Error(`Sequence must have at least one base ${baseSequence}`);
+    return null;
   }
   const end = baseSequence[baseSequence.length - 1]?.index;
   if (end === undefined) {
-    throw new Error(`Sequence must have at least one base ${baseSequence}`);
+    return null;
   }
 
   let maxEnd = end;
   alignedSequences.forEach((alignedSequence) => {
     const otherEnd = alignedSequence.at(alignedSequence.length - 1)?.index;
     if (otherEnd === undefined) {
-      throw new Error(
-        `otherSequence must have at least one base ${alignedSequence}`,
-      );
+      return;
     }
 
     if (otherEnd > maxEnd) {
@@ -298,6 +319,12 @@ const LinearSelection = ({
   sequence: AnnotatedSequence;
   selectionClassName?: (selection: AriadneSelection) => string;
 }) => {
+  const latestSelection = useRef(selection);
+  const latestSetSelection = useRef(setSelection);
+  useEffect(() => {
+    latestSelection.current = selection;
+    latestSetSelection.current = setSelection;
+  }, [selection, setSelection]);
   const {
     start: internalSelectionStart,
     end: internalSelectionEnd,
@@ -319,19 +346,29 @@ const LinearSelection = ({
         );
 
         // show a very small first selection result as start === end because the user probably doesn't want the entire sequence to be highlighted every time they click
-        if (selection == null || start === end) {
-          setSelection({
+        if (latestSelection.current == null || start === end) {
+          latestSetSelection.current({
             start,
             end: start + 1,
             direction: internalDirection,
           });
           return;
         } else {
-          setSelection({ start, end, direction: internalDirection });
+          latestSetSelection.current({
+            start,
+            end,
+            direction: internalDirection,
+          });
         }
       }
     },
-    [internalSelectionStart, internalSelectionEnd],
+    [
+      internalDirection,
+      internalSelectionEnd,
+      internalSelectionStart,
+      selectionRef,
+      sequence.length,
+    ],
   );
 
   if (!selection) {

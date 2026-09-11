@@ -66,9 +66,20 @@ export const CircularViewer = ({
     sizeY: svgSizePX,
     radius: (svgSizePX - (svgPadding + 2)) / 2, // padding +2 to account for stroke width
   };
-  const stackedAnnotations = validation.hasUnsafeSequenceData
-    ? []
-    : stackAnnsByType(validatedAnnotations);
+  const stackedAnnotations = useMemo(
+    () =>
+      validation.hasUnsafeSequenceData
+        ? []
+        : stackAnnsByType(validatedAnnotations),
+    [validatedAnnotations, validation.hasUnsafeSequenceData],
+  );
+  const annotationsForSequence = useMemo(
+    () =>
+      validation.hasUnsafeSequenceData
+        ? []
+        : getStackedAnnotations(validatedAnnotations),
+    [validatedAnnotations, validation.hasUnsafeSequenceData],
+  );
   const annotatedSequence = useMemo(
     function memoize() {
       if (validation.hasUnsafeSequenceData) {
@@ -76,18 +87,29 @@ export const CircularViewer = ({
       }
       return getAnnotatedSequence({
         sequence: validatedSequence,
-        stackedAnnotations: getStackedAnnotations(validatedAnnotations),
+        stackedAnnotations: annotationsForSequence,
       });
     },
-    [validatedSequence, validatedAnnotations, validation.hasUnsafeSequenceData],
+    [
+      annotationsForSequence,
+      validatedSequence,
+      validation.hasUnsafeSequenceData,
+    ],
   );
 
-  if (annotatedSequence && selection && annotatedSequence.length > 0) {
+  let displayedSelection = selection;
+  if (annotatedSequence && displayedSelection && annotatedSequence.length > 0) {
     const firstIdx =
       annotatedSequence.length > 0 ? annotatedSequence.at(0)!.index : 0;
     const lastIdx =
       annotatedSequence.length > 0 ? annotatedSequence.at(-1)!.index : 0;
-    selection = clampSlice({ slice: selection, firstIdx, lastIdx });
+    displayedSelection = clampSlice({
+      slice: displayedSelection,
+      firstIdx,
+      lastIdx,
+    });
+  } else if (annotatedSequence.length === 0) {
+    displayedSelection = null;
   }
   const selectionRef = useRef<SVGSVGElement>(null);
 
@@ -123,22 +145,26 @@ export const CircularViewer = ({
           annotatedSequence={annotatedSequence}
           ticks={4}
         />
-        <CircularAnnotationGutter
-          annotatedSequence={annotatedSequence}
-          stackedAnnotations={stackedAnnotations}
-          cx={cx}
-          cy={cy}
-          radius={radius}
-        />
-        <CircularSelection
-          annotatedSequence={annotatedSequence}
-          selection={selection}
-          cx={cx}
-          cy={cy}
-          radius={radius}
-          selectionRef={selectionRef}
-          setSelection={setSelection}
-        />
+        {annotatedSequence.length > 0 && (
+          <>
+            <CircularAnnotationGutter
+              annotatedSequence={annotatedSequence}
+              stackedAnnotations={stackedAnnotations}
+              cx={cx}
+              cy={cy}
+              radius={radius}
+            />
+            <CircularSelection
+              annotatedSequence={annotatedSequence}
+              selection={displayedSelection}
+              cx={cx}
+              cy={cy}
+              radius={radius}
+              selectionRef={selectionRef}
+              setSelection={setSelection}
+            />
+          </>
+        )}
 
         <text
           x={cx}
@@ -174,6 +200,12 @@ const CircularSelection = ({
   selection: AriadneSelection | null;
   annotatedSequence: AnnotatedSequence;
 }) => {
+  const latestSelection = useRef(selection);
+  const latestSetSelection = useRef(setSelection);
+  useEffect(() => {
+    latestSelection.current = selection;
+    latestSetSelection.current = setSelection;
+  }, [selection, setSelection]);
   /* Collect internal selection data and propogate up */
   const {
     start: internalSelectionStart,
@@ -199,8 +231,9 @@ const CircularSelection = ({
         const direction =
           internalDirection === "clockwise" ? "forward" : "reverse";
 
-        const prevLength = selection
-          ? Math.abs(selection.end - selection.start)
+        const currentSelection = latestSelection.current;
+        const prevLength = currentSelection
+          ? Math.abs(currentSelection.end - currentSelection.start)
           : 0;
         const newLength = getSubsequenceLength(
           { start, end, direction },
@@ -208,24 +241,30 @@ const CircularSelection = ({
         );
         const deltaLength = Math.abs(prevLength - newLength);
         const deltaThreshold = Math.max(0.7 * annotatedSequence.length, 10);
-        if (deltaLength > deltaThreshold && selection) {
+        if (deltaLength > deltaThreshold && currentSelection) {
           // preserve initial direction
-          setSelection({
+          latestSetSelection.current({
             start,
             end,
-            direction: selection?.direction,
+            direction: currentSelection.direction,
           });
 
           return;
         }
-        setSelection({
+        latestSetSelection.current({
           start,
           end,
           direction,
         });
       }
     },
-    [internalSelectionStart, internalSelectionEnd],
+    [
+      annotatedSequence.length,
+      internalDirection,
+      internalSelectionEnd,
+      internalSelectionStart,
+      selectionRef,
+    ],
   );
 
   if (selection === null) {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { annotationSchema } from "./schemas";
 import type { Annotation } from "./types";
+import { EMPTY_ANNOTATIONS } from "./viewerUtils";
+export { EMPTY_ANNOTATIONS } from "./viewerUtils";
 
 export type ValidationMode = "recover" | "strict";
 
@@ -33,7 +35,6 @@ export interface ValidatedViewerInput {
 const viewerSequencesSchema = z.array(z.string());
 
 const EMPTY_SEQUENCES: string[] = [];
-export const EMPTY_ANNOTATIONS: Annotation[] = [];
 
 export const normalizeAnnotationsInput = (annotations: unknown): unknown =>
   annotations === undefined ||
@@ -144,7 +145,9 @@ export const validateViewerInput = ({
           : result.error.issues.map(issueMessage).join(", "),
       });
     });
-    if (validAnnotations.length === 0) {
+    if (validAnnotations.length === annotations.length) {
+      validAnnotations = annotations as Annotation[];
+    } else if (validAnnotations.length === 0) {
       validAnnotations = EMPTY_ANNOTATIONS;
     }
   }

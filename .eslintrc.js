@@ -7,6 +7,7 @@ module.exports = {
     "eslint:recommended",
     "plugin:react/recommended",
     "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
     "plugin:storybook/recommended",
   ],
   overrides: [],
@@ -15,8 +16,17 @@ module.exports = {
     ecmaVersion: "latest",
     sourceType: "module",
   },
-  plugins: ["react", "@typescript-eslint", "react-refresh"],
+  plugins: ["react", "react-hooks", "@typescript-eslint", "react-refresh"],
+  settings: {
+    react: {
+      version: "detect",
+    },
+  },
   rules: {
+    "react-hooks/exhaustive-deps": [
+      "warn",
+      { additionalHooks: "useIsomorphicLayoutEffect" },
+    ],
     "react/react-in-jsx-scope": "off",
     "@typescript-eslint/ban-ts-comment": "warn",
     "@typescript-eslint/no-empty-function": "off",

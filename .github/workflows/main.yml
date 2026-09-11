@@ -28,3 +28,7 @@ jobs:
         run: pnpm run test
       - name: Build component Library
         run: pnpm run build:ci
+      - name: Install browser for packed consumer checks
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build and test packed consumers
+        run: pnpm test:packed

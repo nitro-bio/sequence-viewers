@@ -71,7 +71,7 @@ export const genbankFeaturesToAnnotations = ({
 
 export function getClassNameFromFeatureType(annType: AnnotationType): string {
   const common =
-    "cursor-pointer opacity-60 group-hover:opacity-100 text-xs! hover:opacity-100 pointer-events-all text-white text-clip overflow-hidden whitespace-nowrap";
+    "nsv:cursor-pointer nsv:opacity-60 nsv:group-hover:opacity-100 nsv:text-[0.75rem]/[1rem]! nsv:hover:opacity-100 nsv:pointer-events-all nsv:text-white nsv:text-clip nsv:overflow-hidden nsv:whitespace-nowrap";
   const classNameMap: { [key: AnnotationType]: string } = zipArrays(
     [
       "CDS",
@@ -87,16 +87,16 @@ export function getClassNameFromFeatureType(annType: AnnotationType): string {
       "insertion",
     ],
     [
-      "bg-red-600 fill-red-600 stroke-red-600",
-      "bg-blue-600 fill-blue-600 stroke-blue-600",
-      "bg-green-600 fill-green-600 stroke-green-600",
-      "bg-yellow-600 fill-yellow-600 stroke-yellow-600",
-      "bg-orange-600 fill-orange-600 stroke-orange-600",
-      "bg-purple-600 fill-purple-600 stroke-purple-600",
-      "bg-sky-600 fill-sky-600 stroke-sky-600",
-      "bg-teal-600 fill-teal-600 stroke-teal-600",
-      "bg-gray-600 fill-gray-600 stroke-gray-600",
-      "bg-pink-600 fill-pink-600 stroke-pink-600",
+      "nsv:bg-red-600 nsv:fill-red-600 nsv:stroke-red-600",
+      "nsv:bg-blue-600 nsv:fill-blue-600 nsv:stroke-blue-600",
+      "nsv:bg-green-600 nsv:fill-green-600 nsv:stroke-green-600",
+      "nsv:bg-yellow-600 nsv:fill-yellow-600 nsv:stroke-yellow-600",
+      "nsv:bg-orange-600 nsv:fill-orange-600 nsv:stroke-orange-600",
+      "nsv:bg-purple-600 nsv:fill-purple-600 nsv:stroke-purple-600",
+      "nsv:bg-sky-600 nsv:fill-sky-600 nsv:stroke-sky-600",
+      "nsv:bg-teal-600 nsv:fill-teal-600 nsv:stroke-teal-600",
+      "nsv:bg-gray-600 nsv:fill-gray-600 nsv:stroke-gray-600",
+      "nsv:bg-pink-600 nsv:fill-pink-600 nsv:stroke-pink-600",
     ],
   );
   if (annType in classNameMap) {

@@ -15,15 +15,25 @@ import { stackAnnsByType } from "..";
 import { CircularAnnotationGutter } from "./CircularAnnotations";
 import { CircularIndex } from "./CircularIndex";
 import { clampSlice, findIndexFromAngle, genArc } from "./circularUtils";
+import { ViewerValidationMessages } from "../ViewerValidationMessages";
+import {
+  normalizeAnnotationsInput,
+  resolveValidationMode,
+  validateViewerInput,
+  type ValidationMode,
+} from "../validation";
 
 export interface Props {
   sequence: string;
-  annotations: Annotation[];
+  annotations?: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection) => void;
   containerClassName?: string;
   svgSizePX?: number;
   svgPadding?: number;
+  validationMode?: ValidationMode;
+  /** @deprecated Use validationMode. */
+  noValidate?: boolean;
 }
 
 export const CircularViewer = ({
@@ -34,7 +44,21 @@ export const CircularViewer = ({
   containerClassName,
   svgSizePX = 300,
   svgPadding = 20,
+  validationMode,
+  noValidate,
 }: Props) => {
+  const annotationsInput = normalizeAnnotationsInput(annotations);
+  const validation = useMemo(
+    () =>
+      validateViewerInput({
+        sequences: [sequence],
+        annotations: annotationsInput,
+        mode: resolveValidationMode({ validationMode, noValidate }),
+      }),
+    [annotationsInput, noValidate, sequence, validationMode],
+  );
+  const validatedSequence = validation.sequences[0] ?? "";
+  const validatedAnnotations = validation.annotations;
   const { cx, cy, sizeX, sizeY, radius } = {
     cx: svgSizePX / 2,
     cy: svgSizePX / 2,
@@ -42,33 +66,71 @@ export const CircularViewer = ({
     sizeY: svgSizePX,
     radius: (svgSizePX - (svgPadding + 2)) / 2, // padding +2 to account for stroke width
   };
-  const stackedAnnotations = stackAnnsByType(annotations);
+  const stackedAnnotations = useMemo(
+    () =>
+      validation.hasUnsafeSequenceData
+        ? []
+        : stackAnnsByType(validatedAnnotations),
+    [validatedAnnotations, validation.hasUnsafeSequenceData],
+  );
+  const annotationsForSequence = useMemo(
+    () =>
+      validation.hasUnsafeSequenceData
+        ? []
+        : getStackedAnnotations(validatedAnnotations),
+    [validatedAnnotations, validation.hasUnsafeSequenceData],
+  );
   const annotatedSequence = useMemo(
     function memoize() {
+      if (validation.hasUnsafeSequenceData) {
+        return [];
+      }
       return getAnnotatedSequence({
-        sequence,
-        stackedAnnotations: getStackedAnnotations(annotations),
+        sequence: validatedSequence,
+        stackedAnnotations: annotationsForSequence,
       });
     },
-    [sequence, annotations],
+    [
+      annotationsForSequence,
+      validatedSequence,
+      validation.hasUnsafeSequenceData,
+    ],
   );
 
-  if (annotatedSequence && selection && annotatedSequence.length > 0) {
+  let displayedSelection = selection;
+  if (annotatedSequence && displayedSelection && annotatedSequence.length > 0) {
     const firstIdx =
       annotatedSequence.length > 0 ? annotatedSequence.at(0)!.index : 0;
     const lastIdx =
       annotatedSequence.length > 0 ? annotatedSequence.at(-1)!.index : 0;
-    selection = clampSlice({ slice: selection, firstIdx, lastIdx });
+    displayedSelection = clampSlice({
+      slice: displayedSelection,
+      firstIdx,
+      lastIdx,
+    });
+  } else if (annotatedSequence.length === 0) {
+    displayedSelection = null;
   }
   const selectionRef = useRef<SVGSVGElement>(null);
 
+  if (validation.hasUnsafeSequenceData) {
+    return (
+      <div
+        className={classNames("nsv-root nsv-circular-root", containerClassName)}
+      >
+        <ViewerValidationMessages
+          diagnostics={validation.diagnostics}
+          sequenceUnavailable
+        />
+      </div>
+    );
+  }
+
   return (
     <div
-      className={classNames(
-        "text-sequences-primary flex items-center justify-center font-thin select-none",
-        containerClassName,
-      )}
+      className={classNames("nsv-root nsv-circular-root", containerClassName)}
     >
+      <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
         ref={selectionRef}
         viewBox={`0 0 ${sizeX} ${sizeY}`}
@@ -76,7 +138,7 @@ export const CircularViewer = ({
         fontFamily="inherit"
         fontSize="inherit"
         fontWeight="inherit"
-        className={`stroke-current`}
+        className="nsv:stroke-current"
         width={sizeX}
         height={sizeY}
       >
@@ -87,22 +149,26 @@ export const CircularViewer = ({
           annotatedSequence={annotatedSequence}
           ticks={4}
         />
-        <CircularAnnotationGutter
-          annotatedSequence={annotatedSequence}
-          stackedAnnotations={stackedAnnotations}
-          cx={cx}
-          cy={cy}
-          radius={radius}
-        />
-        <CircularSelection
-          annotatedSequence={annotatedSequence}
-          selection={selection}
-          cx={cx}
-          cy={cy}
-          radius={radius}
-          selectionRef={selectionRef}
-          setSelection={setSelection}
-        />
+        {annotatedSequence.length > 0 && (
+          <>
+            <CircularAnnotationGutter
+              annotatedSequence={annotatedSequence}
+              stackedAnnotations={stackedAnnotations}
+              cx={cx}
+              cy={cy}
+              radius={radius}
+            />
+            <CircularSelection
+              annotatedSequence={annotatedSequence}
+              selection={displayedSelection}
+              cx={cx}
+              cy={cy}
+              radius={radius}
+              selectionRef={selectionRef}
+              setSelection={setSelection}
+            />
+          </>
+        )}
 
         <text
           x={cx}
@@ -138,6 +204,14 @@ const CircularSelection = ({
   selection: AriadneSelection | null;
   annotatedSequence: AnnotatedSequence;
 }) => {
+  const latestSelection = useRef(selection);
+  const latestSequenceLength = useRef(annotatedSequence.length);
+  const latestSetSelection = useRef(setSelection);
+  useEffect(() => {
+    latestSelection.current = selection;
+    latestSequenceLength.current = annotatedSequence.length;
+    latestSetSelection.current = setSelection;
+  }, [selection, setSelection, annotatedSequence.length]);
   /* Collect internal selection data and propogate up */
   const {
     start: internalSelectionStart,
@@ -154,42 +228,48 @@ const CircularSelection = ({
       ) {
         const start = findIndexFromAngle({
           angle: internalSelectionStart,
-          seqLength: annotatedSequence.length,
+          seqLength: latestSequenceLength.current,
         });
         const end = findIndexFromAngle({
           angle: internalSelectionEnd,
-          seqLength: annotatedSequence.length,
+          seqLength: latestSequenceLength.current,
         });
         const direction =
           internalDirection === "clockwise" ? "forward" : "reverse";
 
-        const prevLength = selection
-          ? Math.abs(selection.end - selection.start)
+        const currentSelection = latestSelection.current;
+        const prevLength = currentSelection
+          ? Math.abs(currentSelection.end - currentSelection.start)
           : 0;
         const newLength = getSubsequenceLength(
           { start, end, direction },
-          annotatedSequence.length,
+          latestSequenceLength.current,
         );
         const deltaLength = Math.abs(prevLength - newLength);
-        const deltaThreshold = Math.max(0.7 * annotatedSequence.length, 10);
-        if (deltaLength > deltaThreshold && selection) {
+        const deltaThreshold = Math.max(0.7 * latestSequenceLength.current, 10);
+        if (deltaLength > deltaThreshold && currentSelection) {
           // preserve initial direction
-          setSelection({
+          latestSetSelection.current({
             start,
             end,
-            direction: selection?.direction,
+            direction: currentSelection.direction,
           });
 
           return;
         }
-        setSelection({
+        latestSetSelection.current({
           start,
           end,
           direction,
         });
       }
     },
-    [internalSelectionStart, internalSelectionEnd],
+    [
+      internalDirection,
+      internalSelectionEnd,
+      internalSelectionStart,
+      selectionRef,
+    ],
   );
 
   if (selection === null) {

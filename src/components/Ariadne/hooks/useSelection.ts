@@ -1,7 +1,7 @@
 import { findAngleFromCoor } from "@Ariadne/CircularViewer/circularUtils";
 import { Angle, Coor } from "@Ariadne/types";
 import { inRange } from "@Ariadne/utils";
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { useStateRef } from "./useStateRef";
 
 /* useLinearSelectionRect manages the selection of a LinearSelection within
@@ -39,31 +39,8 @@ export const useLinearSelectionRect = <
 
   const active = useRef(false);
 
-  const _onMouseDown = (e: MouseEvent) => {
-    const { clientX, clientY } = e;
-    const { left, top } = ref.current?.getBoundingClientRect() || {
-      left: 0,
-      top: 0,
-    };
-    const x = clientX - left;
-    const y = clientY - top;
-    active.current = true;
-    setStart({ x, y });
-    setEnd({ x, y });
-    onMouseDown?.({ start: { x, y } });
-  };
-  const _onMouseUp = () => {
-    active.current = false;
-    if (startRef.current && endRef.current) {
-      onMouseUp?.({ start: startRef.current, end: endRef.current });
-    } else {
-      console.error("start or end is null when mouseup");
-    }
-  };
-
-  // must use refs in event handlers to get most up to date values
-  const _onMouseMove = (e: MouseEvent) => {
-    if (active.current) {
+  const _onMouseDown = useCallback(
+    (e: MouseEvent) => {
       const { clientX, clientY } = e;
       const { left, top } = ref.current?.getBoundingClientRect() || {
         left: 0,
@@ -71,29 +48,56 @@ export const useLinearSelectionRect = <
       };
       const x = clientX - left;
       const y = clientY - top;
-      const { startX } = {
-        startX: startRef.current?.x,
-      };
-      if (startX && startX > x) {
-        setDirection("reverse");
-      } else {
-        setDirection("forward");
-      }
+      active.current = true;
+      setStart({ x, y });
       setEnd({ x, y });
-      if (startRef.current && endRef.current) {
-        onMouseMove?.({ start: startRef.current, end: endRef.current });
-      } else {
-        console.error("start is null when mousemove");
-      }
+      onMouseDown?.({ start: { x, y } });
+    },
+    [onMouseDown, ref, setEnd, setStart],
+  );
+  const _onMouseUp = useCallback(() => {
+    active.current = false;
+    if (startRef.current && endRef.current) {
+      onMouseUp?.({ start: startRef.current, end: endRef.current });
+    } else {
+      console.error("start or end is null when mouseup");
     }
-  };
+  }, [endRef, onMouseUp, startRef]);
+
+  // must use refs in event handlers to get most up to date values
+  const _onMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (active.current) {
+        const { clientX, clientY } = e;
+        const { left, top } = ref.current?.getBoundingClientRect() || {
+          left: 0,
+          top: 0,
+        };
+        const x = clientX - left;
+        const y = clientY - top;
+        const startX = startRef.current?.x;
+        if (startX !== undefined && startX > x) {
+          setDirection("reverse");
+        } else {
+          setDirection("forward");
+        }
+        setEnd({ x, y });
+        if (startRef.current && endRef.current) {
+          onMouseMove?.({ start: startRef.current, end: endRef.current });
+        } else {
+          console.error("start is null when mousemove");
+        }
+      }
+    },
+    [endRef, onMouseMove, ref, setEnd, startRef],
+  );
   useEffect(() => {
     const node = ref?.current;
     if (node) {
       node.addEventListener("mousedown", _onMouseDown);
       node.addEventListener("mousemove", _onMouseMove);
     }
-    if (window) {
+    if (typeof window !== "undefined") {
       // still want to call mouseup if mouse leaves parent
       window.addEventListener("mouseup", _onMouseUp);
     }
@@ -102,7 +106,7 @@ export const useLinearSelectionRect = <
       node?.removeEventListener("mousemove", _onMouseMove);
       window?.removeEventListener("mouseup", _onMouseUp);
     };
-  }, [ref]);
+  }, [_onMouseDown, _onMouseMove, _onMouseUp, ref]);
   return { start, end, direction };
 };
 
@@ -120,71 +124,79 @@ export const useCircularSelectionRect = (
 
   const active = useRef(false);
 
-  const onMouseDown = (e: MouseEvent) => {
-    if (ref.current) {
-      console.debug("resetting start and end");
-      setStart(null);
-      setEnd(null);
-      setDirection(null);
-      active.current = true;
+  const onMouseDown = useCallback(
+    (e: MouseEvent) => {
+      if (ref.current) {
+        console.debug("resetting start and end");
+        setStart(null);
+        setEnd(null);
+        setDirection(null);
+        active.current = true;
 
-      const { clientX, clientY } = e;
-      const { left, top, width, height } = ref.current.getBoundingClientRect();
-      const x = clientX - left;
-      const y = clientY - top;
-      const center = { x: width / 2, y: height / 2 };
-      const startAngle = findAngleFromCoor({ coor: { x, y }, center });
-      setStart({
-        degrees: startAngle,
-        center,
-      });
-    }
-  };
+        const { clientX, clientY } = e;
+        const { left, top, width, height } =
+          ref.current.getBoundingClientRect();
+        const x = clientX - left;
+        const y = clientY - top;
+        const center = { x: width / 2, y: height / 2 };
+        const startAngle = findAngleFromCoor({ coor: { x, y }, center });
+        setStart({
+          degrees: startAngle,
+          center,
+        });
+      }
+    },
+    [ref, setDirection, setEnd, setStart],
+  );
 
-  const onMouseUp = () => {
+  const onMouseUp = useCallback(() => {
     active.current = false;
 
     setDirection(null);
-  };
+  }, [setDirection]);
 
-  const onMouseMove = (e: MouseEvent) => {
-    if (active.current && ref.current) {
-      const { clientX, clientY } = e;
-      const { left, top, width, height } = ref.current.getBoundingClientRect();
-      const x = clientX - left;
-      const y = clientY - top;
-      const center = { x: width / 2, y: height / 2 };
-      // if we're close to the center, don't update selection
-      if (
-        Math.sqrt(Math.pow(x - center.x, 2) + Math.pow(y - center.y, 2)) <
-        0.4 * (width / 2)
-      ) {
-        console.debug("within 0.5 radius of center, not updating selection");
-        return;
-      }
-
-      const endAngle = findAngleFromCoor({ coor: { x, y }, center });
-      if (startRef.current) {
-        const startAngle = startRef.current.degrees;
-        const endAngleIsNearStartAngle = inRange(
-          endAngle,
-          startAngle - ANGLE_DELTA_THRESHOLD_IN_DEGREES,
-          startAngle + ANGLE_DELTA_THRESHOLD_IN_DEGREES,
-        );
-        if (endAngleIsNearStartAngle) {
-          setDirection(null);
+  const onMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (active.current && ref.current) {
+        const { clientX, clientY } = e;
+        const { left, top, width, height } =
+          ref.current.getBoundingClientRect();
+        const x = clientX - left;
+        const y = clientY - top;
+        const center = { x: width / 2, y: height / 2 };
+        // if we're close to the center, don't update selection
+        if (
+          Math.sqrt(Math.pow(x - center.x, 2) + Math.pow(y - center.y, 2)) <
+          0.4 * (width / 2)
+        ) {
+          console.debug("within 0.5 radius of center, not updating selection");
+          return;
         }
+
+        const endAngle = findAngleFromCoor({ coor: { x, y }, center });
+        if (startRef.current) {
+          const startAngle = startRef.current.degrees;
+          const endAngleIsNearStartAngle = inRange(
+            endAngle,
+            startAngle - ANGLE_DELTA_THRESHOLD_IN_DEGREES,
+            startAngle + ANGLE_DELTA_THRESHOLD_IN_DEGREES,
+          );
+          if (endAngleIsNearStartAngle) {
+            setDirection(null);
+          }
+        }
+        setEnd({
+          degrees: endAngle,
+          center,
+        });
       }
-      setEnd({
-        degrees: endAngle,
-        center,
-      });
-    }
-  };
+    },
+    [ref, setDirection, setEnd, startRef],
+  );
 
   useEffect(
     function determineDirection() {
-      if (start && end && direction === null) {
+      if (active.current && start && end && direction === null) {
         const startAngle = start.degrees;
         const endAngle = end.degrees;
         const delta = endAngle - startAngle;
@@ -192,7 +204,7 @@ export const useCircularSelectionRect = (
         setDirection(guessedDirection);
       }
     },
-    [start, end],
+    [direction, end, setDirection, start],
   );
 
   useEffect(
@@ -203,7 +215,7 @@ export const useCircularSelectionRect = (
         node.addEventListener("mousemove", onMouseMove);
         node.addEventListener("mouseup", onMouseUp);
       }
-      if (window) {
+      if (typeof window !== "undefined") {
         window.addEventListener("mouseup", onMouseUp);
       }
 
@@ -214,7 +226,7 @@ export const useCircularSelectionRect = (
         window?.removeEventListener("mouseup", onMouseUp);
       };
     },
-    [ref.current, start, direction],
+    [onMouseDown, onMouseMove, onMouseUp, ref],
   );
   return { start, end, direction };
 };

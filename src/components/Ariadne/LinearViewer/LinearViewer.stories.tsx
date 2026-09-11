@@ -39,7 +39,7 @@ const LinearStory = ({
         maxSequences: maxSequences || 5,
         maxLength: maxSequenceLength || 100,
       }),
-    [],
+    [maxSequenceLength, maxSequences],
   );
 
   const [selection, setSelection] = useState<AriadneSelection | null>(

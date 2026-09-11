@@ -17,13 +17,13 @@ export const CopyButton = ({
   disabled?: boolean;
 }) => {
   const [logo, setLogo] = useState<ReactNode>(
-    <CopyIcon className={cn("size-3", logoClassName)} />,
+    <CopyIcon className={cn("nsv:size-3", logoClassName)} />,
   );
   const [internalLabel, setInternalLabel] = useState<ReactNode>(label);
   const onClipboardCopy = () => {
-    setLogo(<CheckIcon className={cn("size-3", logoClassName)} />);
+    setLogo(<CheckIcon className={cn("nsv:size-3", logoClassName)} />);
     setTimeout(() => {
-      setLogo(<CopyIcon className={cn("size-3", logoClassName)} />);
+      setLogo(<CopyIcon className={cn("nsv:size-3", logoClassName)} />);
       setInternalLabel(label);
     }, 1000);
   };
@@ -33,7 +33,7 @@ export const CopyButton = ({
       size="xs"
       disabled={disabled}
       className={cn(
-        "flex items-center gap-2 !p-0 disabled:cursor-not-allowed disabled:dark:dark:disabled:text-zinc-600",
+        "nsv:flex nsv:items-center nsv:gap-2 nsv:p-0! nsv:disabled:cursor-not-allowed nsv:dark:disabled:text-zinc-600",
         buttonClassName,
       )}
       onClick={() => {

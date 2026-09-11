@@ -1,11 +1,106 @@
-@import "tailwindcss";
+@layer theme, base, components, utilities;
 
-@theme inline {
-  --color-sequences-primary: var(--color-emerald-700);
-  --color-sequences-secondary: var(--color-zinc-600);
-  --color-sequences-selection: var(--color-emerald-600);
-  --color-sequences-foreground: var(--color-zinc-800);
-  --color-sequences-background: var(--color-zinc-50);
-  --color-sequences-mismatch: var(--color-red-400);
-  --color-sequences-gap: var(--color-zinc-500);
+/*
+ * The package stylesheet deliberately omits Tailwind's preflight layer. The
+ * prefixed theme and utilities keep library styles from colliding with a host
+ * application's Tailwind version or design tokens.
+ */
+@import "tailwindcss/theme.css" layer(theme) prefix(nsv) theme(reference);
+@import "tailwindcss/utilities.css" prefix(nsv);
+
+@theme reference {
+  --color-sequences-primary: oklch(50.8% 0.118 165.612);
+  --color-sequences-secondary: oklch(44.2% 0.017 285.786);
+  --color-sequences-selection: oklch(59.6% 0.145 163.225);
+  --color-sequences-foreground: oklch(27.4% 0.006 286.033);
+  --color-sequences-background: oklch(98.5% 0 0);
+  --color-sequences-mismatch: oklch(70.4% 0.191 22.216);
+  --color-sequences-gap: oklch(55.2% 0.016 285.938);
+}
+
+/* Low-specificity defaults keep public caller class hooks authoritative. */
+@layer utilities {
+  :where(.nsv-sequence-root) {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  :where(.nsv-circular-root) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--nsv-color-sequences-primary, oklch(50.8% 0.118 165.612));
+    font-weight: 100;
+    user-select: none;
+  }
+
+  :where(.nsv-linear-primary) {
+    color: var(--nsv-color-sequences-primary, oklch(50.8% 0.118 165.612));
+  }
+
+  :where(.nsv-linear-secondary) {
+    color: var(--nsv-color-sequences-secondary, oklch(44.2% 0.017 285.786));
+  }
+
+  :where(.nsv-linear-selection) {
+    color: var(--nsv-color-sequences-selection, oklch(59.6% 0.145 163.225));
+    background-color: var(
+      --nsv-color-sequences-selection,
+      oklch(59.6% 0.145 163.225)
+    );
+    fill: var(--nsv-color-sequences-selection, oklch(59.6% 0.145 163.225));
+    stroke: var(--nsv-color-sequences-selection, oklch(59.6% 0.145 163.225));
+  }
+
+  :where(.nsv-sequence-selection) {
+    background-color: color-mix(
+      in oklab,
+      var(--nsv-color-sequences-selection, oklch(59.6% 0.145 163.225)) 20%,
+      transparent
+    );
+  }
+}
+
+/* Minimal component-local defaults previously supplied by preflight. */
+:where(.nsv-root, .nsv-portal),
+:where(.nsv-root *, .nsv-portal *) {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: currentColor;
+}
+
+:where(.nsv-root p, .nsv-portal p) {
+  margin: 0;
+}
+
+:where(
+  .nsv-root button,
+  .nsv-root select,
+  .nsv-portal button,
+  .nsv-portal select
+) {
+  margin: 0;
+  font: inherit;
+  font-feature-settings: inherit;
+  font-variation-settings: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-transform: none;
+  background-color: transparent;
+  border-radius: 0;
+  opacity: 1;
+}
+
+:where(.nsv-root button, .nsv-portal button) {
+  appearance: button;
+  background-image: none;
+}
+
+:where(.nsv-root svg, .nsv-portal svg) {
+  display: block;
+  vertical-align: middle;
 }

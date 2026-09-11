@@ -38,7 +38,7 @@ const SequenceStory = ({
         maxSequences: numSequences,
         maxLength: 1000,
       }),
-    [],
+    [numSequences],
   );
 
   const defaultCharClassName = ({ sequenceIdx }: { sequenceIdx: number }) => {
@@ -57,7 +57,7 @@ const SequenceStory = ({
     <div className="grid min-h-screen content-center py-8">
       <div className="max-w-4xl">
         <SequenceViewer
-          sequences={sequences.sort((a, b) => a.length - b.length)}
+          sequences={[...sequences].sort((a, b) => a.length - b.length)}
           annotations={annotations}
           selection={selection}
           charClassName={charClassName ?? defaultCharClassName}

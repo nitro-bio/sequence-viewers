@@ -14,10 +14,19 @@ import {
   StackedAnnotation,
 } from "../types";
 import { LinearAnnotationGutter } from "./LinearAnnotationGutter";
+import { ViewerValidationMessages } from "../ViewerValidationMessages";
+import {
+  normalizeAnnotationsInput,
+  resolveValidationMode,
+  validateViewerInput,
+  type ValidationMode,
+} from "../validation";
+import { clampSlice } from "../CircularViewer/circularUtils";
+import { getMaxSequenceLength } from "../viewerUtils";
 
 export interface Props {
   sequences: string[];
-  annotations: Annotation[];
+  annotations?: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection | null) => void;
   onDoubleClick?: () => void;
@@ -30,6 +39,9 @@ export interface Props {
   }) => string | string;
   mismatchClassName?: (mismatchedBase: AnnotatedBase) => string;
   stackingFn?: (annotations: Annotation[]) => StackedAnnotation[];
+  validationMode?: ValidationMode;
+  /** @deprecated Use validationMode. */
+  noValidate?: boolean;
 }
 
 const MISMATCH_DIST_PERC_THRESHOLD = 0.01;
@@ -46,39 +58,73 @@ export const LinearViewer = (props: Props) => {
     containerClassName,
     sequenceClassName,
     stackingFn,
+    validationMode,
+    noValidate,
   } = props;
+
+  const annotationsInput = normalizeAnnotationsInput(annotations);
+  const validation = useMemo(
+    () =>
+      validateViewerInput({
+        sequences,
+        annotations: annotationsInput,
+        mode: resolveValidationMode({ validationMode, noValidate }),
+      }),
+    [annotationsInput, noValidate, sequences, validationMode],
+  );
+  const validatedSequences = validation.sequences;
+  const maxSequenceLength = getMaxSequenceLength(validatedSequences);
+  const validatedAnnotations = validation.annotations;
 
   const stackedAnnotations = useMemo(
     function memoize() {
+      if (validation.hasUnsafeSequenceData) {
+        return [];
+      }
       // if a stacking function is provided, use it, otherwise use the default which
       // stacks annotations to prevent overlap.
       return stackingFn
-        ? stackingFn(annotations)
-        : stackAnnotationsNoOverlap(
-            annotations,
-            Math.max(...sequences.map((seq) => seq.length)),
-          );
+        ? stackingFn(validatedAnnotations)
+        : stackAnnotationsNoOverlap(validatedAnnotations, maxSequenceLength);
     },
-    [annotations],
+    [
+      stackingFn,
+      validatedAnnotations,
+      maxSequenceLength,
+      validation.hasUnsafeSequenceData,
+    ],
   );
 
   const annotatedSequences = useMemo(
     function memoize() {
-      return sequences.map((sequence) =>
+      return validatedSequences.map((sequence) =>
         getAnnotatedSequence({ sequence, stackedAnnotations }),
       );
     },
-    [sequences, stackedAnnotations],
+    [validatedSequences, stackedAnnotations],
   );
 
   const baseSequence = annotatedSequences[0];
+  const hasSequenceData = annotatedSequences.some(
+    (annotatedSequence) => annotatedSequence.length > 0,
+  );
+  const displayedSelection =
+    maxSequenceLength === 0 ||
+    (selection && Math.min(selection.start, selection.end) >= maxSequenceLength)
+      ? null
+      : clampSlice({
+          slice: selection,
+          firstIdx: 0,
+          // Linear selections use boundaries: length is a valid end position.
+          lastIdx: maxSequenceLength,
+        });
   const selectionRef = useRef<SVGSVGElement>(null);
 
   // const numberOfTicks = 5;
   // const basesPerTick = Math.floor(sequence.length / numberOfTicks);
 
   const SVG_WIDTH = 500;
-  const SVG_HEIGHT = sequences.length * 10 + 10;
+  const SVG_HEIGHT = validatedSequences.length * 10 + 10;
 
   const getSequenceClassNameProp = ({
     sequenceIdx,
@@ -93,16 +139,38 @@ export const LinearViewer = (props: Props) => {
     }
     return classNames(
       userProvided,
-      sequenceIdx == 0 && "text-sequences-primary",
-      sequenceIdx > 0 && "text-sequences-secondary",
+      sequenceIdx == 0 && "nsv-linear-primary",
+      sequenceIdx > 0 && "nsv-linear-secondary",
     );
   };
 
+  if (validation.hasUnsafeSequenceData) {
+    return (
+      <div className={classNames("nsv-root", containerClassName)}>
+        <ViewerValidationMessages
+          diagnostics={validation.diagnostics}
+          sequenceUnavailable
+        />
+      </div>
+    );
+  }
+  if (!hasSequenceData) {
+    return (
+      <div
+        className={classNames("nsv-root", containerClassName)}
+        data-empty="true"
+      >
+        <ViewerValidationMessages diagnostics={validation.diagnostics} />
+      </div>
+    );
+  }
+
   return (
-    <div className={containerClassName || ""}>
+    <div className={classNames("nsv-root", containerClassName)}>
+      <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
         ref={selectionRef}
-        className={classNames("font-thin select-none")}
+        className={classNames("nsv:[font-weight:100] nsv:select-none")}
         onDoubleClick={onDoubleClick}
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
         width="100%"
@@ -122,15 +190,17 @@ export const LinearViewer = (props: Props) => {
             </g>
           ))}
         </g>
-        <LinearSelection
-          selectionClassName={selectionClassName}
-          selectionRef={selectionRef}
-          selection={selection}
-          setSelection={setSelection}
-          sequence={baseSequence}
-        />
+        {baseSequence?.length > 0 && (
+          <LinearSelection
+            selectionClassName={selectionClassName}
+            selectionRef={selectionRef}
+            selection={displayedSelection}
+            setSelection={setSelection}
+            sequence={baseSequence}
+          />
+        )}
       </svg>
-      {stackedAnnotations.length > 0 && (
+      {stackedAnnotations.length > 0 && baseSequence?.length > 0 && (
         <LinearAnnotationGutter
           containerClassName=""
           stackedAnnotations={stackedAnnotations}
@@ -158,28 +228,27 @@ const SequenceLine = ({
 }: SequenceLineProps) => {
   const start = baseSequence[0]?.index;
   if (start === undefined) {
-    throw new Error(`Sequence must have at least one base ${baseSequence}`);
+    return null;
   }
   const end = baseSequence[baseSequence.length - 1]?.index;
   if (end === undefined) {
-    throw new Error(`Sequence must have at least one base ${baseSequence}`);
+    return null;
   }
 
   let maxEnd = end;
   alignedSequences.forEach((alignedSequence) => {
     const otherEnd = alignedSequence.at(alignedSequence.length - 1)?.index;
     if (otherEnd === undefined) {
-      throw new Error(
-        `otherSequence must have at least one base ${alignedSequence}`,
-      );
+      return;
     }
 
     if (otherEnd > maxEnd) {
       maxEnd = otherEnd;
     }
   });
-  const startPerc = start / maxEnd;
-  const endPerc = end / maxEnd;
+  const coordinateDenominator = maxEnd === 0 ? 1 : maxEnd;
+  const startPerc = start / coordinateDenominator;
+  const endPerc = maxEnd === 0 ? 1 : end / coordinateDenominator;
 
   // mismatches
   const mismatches = baseSequence.filter((base) => {
@@ -190,9 +259,9 @@ const SequenceLine = ({
     mismatchClassName ??
     function mismatchClassName(mismatch: AnnotatedBase) {
       if (mismatch.base === "-") {
-        return "fill-black stroke-black opacity-80";
+        return "nsv:fill-black nsv:stroke-black nsv:opacity-80";
       } else {
-        return "dark:fill-red-600 dark:stroke-red-600 fill-red-700 stroke-red-700";
+        return "nsv:dark:fill-red-600 nsv:dark:stroke-red-600 nsv:fill-red-700 nsv:stroke-red-700";
       }
     };
 
@@ -210,7 +279,7 @@ const SequenceLine = ({
         stroke="currentColor"
       />
       {mismatches.map((base) => {
-        const xPerc = (base.index / maxEnd) * 100;
+        const xPerc = (base.index / coordinateDenominator) * 100;
         const width = Math.max((1 / baseSequence.length) * 100, 0.01);
         const diff = xPerc - lastXPerc;
         if (diff < MISMATCH_DIST_PERC_THRESHOLD) {
@@ -222,7 +291,9 @@ const SequenceLine = ({
         lastXPerc = xPerc;
         return (
           <g
-            className={classNames(mismatchClassName?.(base) || "bg-red-400")}
+            className={classNames(
+              mismatchClassName?.(base) || "nsv:bg-red-400",
+            )}
             key={`sequence-${sequenceIdx}-mismatch-${base.index}`}
           >
             <line
@@ -252,6 +323,14 @@ const LinearSelection = ({
   sequence: AnnotatedSequence;
   selectionClassName?: (selection: AriadneSelection) => string;
 }) => {
+  const latestSelection = useRef(selection);
+  const latestSequenceLength = useRef(sequence.length);
+  const latestSetSelection = useRef(setSelection);
+  useEffect(() => {
+    latestSelection.current = selection;
+    latestSequenceLength.current = sequence.length;
+    latestSetSelection.current = setSelection;
+  }, [selection, setSelection, sequence.length]);
   const {
     start: internalSelectionStart,
     end: internalSelectionEnd,
@@ -266,26 +345,35 @@ const LinearSelection = ({
       ) {
         const svgWidth = selectionRef.current?.getBoundingClientRect().width;
         const start = Math.floor(
-          (internalSelectionStart.x / svgWidth) * sequence.length,
+          (internalSelectionStart.x / svgWidth) * latestSequenceLength.current,
         );
         const end = Math.floor(
-          (internalSelectionEnd.x / svgWidth) * sequence.length,
+          (internalSelectionEnd.x / svgWidth) * latestSequenceLength.current,
         );
 
         // show a very small first selection result as start === end because the user probably doesn't want the entire sequence to be highlighted every time they click
-        if (selection == null || start === end) {
-          setSelection({
+        if (latestSelection.current == null || start === end) {
+          latestSetSelection.current({
             start,
             end: start + 1,
             direction: internalDirection,
           });
           return;
         } else {
-          setSelection({ start, end, direction: internalDirection });
+          latestSetSelection.current({
+            start,
+            end,
+            direction: internalDirection,
+          });
         }
       }
     },
-    [internalSelectionStart, internalSelectionEnd],
+    [
+      internalDirection,
+      internalSelectionEnd,
+      internalSelectionStart,
+      selectionRef,
+    ],
   );
 
   if (!selection) {
@@ -316,8 +404,8 @@ const LinearSelection = ({
   return (
     <g
       className={classNames(
-        "fill-current stroke-current",
-        "bg-sequences-selection fill-sequences-selection text-sequences-selection stroke-sequences-selection",
+        "nsv:fill-current nsv:stroke-current",
+        "nsv-linear-selection",
         selectionClassName?.(selection),
       )}
     >

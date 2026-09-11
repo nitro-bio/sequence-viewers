@@ -27,3 +27,8 @@ storybook-static
 storybook-static
 /*.tgz
 /.env
+
+.worktrees/
+playwright-report/
+test-results/
+.packed-test/

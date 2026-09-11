@@ -19,7 +19,7 @@ export const CircularIndex = ({
 
   if (annotatedSequence.length > 50) {
     return (
-      <svg className={`fill-current`}>
+      <svg className="nsv:fill-current">
         <g>
           <circle
             cx={cx}

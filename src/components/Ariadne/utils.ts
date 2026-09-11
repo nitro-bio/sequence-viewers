@@ -1,6 +1,7 @@
 import genbankParser, { ParsedGenbank } from "genbank-parser";
 import { genbankToAnnotatedSequence } from "./genbankUtils";
-import { annotatedSequenceSchema } from "./schemas";
+import { z } from "zod";
+import { annotatedSequenceSchema, stackedAnnotationSchema } from "./schemas";
 import type {
   AnnotatedSequence,
   Annotation,
@@ -35,14 +36,44 @@ export const getAnnotatedSequence = ({
   sequence,
   stackedAnnotations,
   noValidate,
+  validationMode,
 }: {
   sequence: string;
   stackedAnnotations: Annotation[];
+  /** @deprecated Use validationMode. */
   noValidate?: boolean;
+  /** Parsing helpers remain strict by default. */
+  validationMode?: "recover" | "strict";
 }): AnnotatedSequence => {
+  const mode =
+    validationMode ??
+    (noValidate === undefined ? "strict" : noValidate ? "recover" : "strict");
+  const sequenceResult = z.string().safeParse(sequence);
+  if (!sequenceResult.success) {
+    if (mode === "strict") {
+      throw new Error(sequenceResult.error.message);
+    }
+    return [];
+  }
+
+  const stackedAnnotationsResult = z
+    .array(stackedAnnotationSchema)
+    .safeParse(stackedAnnotations);
+  let safeStackedAnnotations = stackedAnnotations;
+  if (!stackedAnnotationsResult.success) {
+    if (mode === "strict") {
+      throw new Error(stackedAnnotationsResult.error.message);
+    }
+    safeStackedAnnotations = Array.isArray(stackedAnnotations)
+      ? stackedAnnotations.filter(
+          (annotation) => stackedAnnotationSchema.safeParse(annotation).success,
+        )
+      : [];
+  }
+
   /* loop through sequence finding all annoatations that apply to each base */
   const mapFn = (base: string, idx: number) => {
-    const annotationsForBase = stackedAnnotations.filter((annotation) => {
+    const annotationsForBase = safeStackedAnnotations.filter((annotation) => {
       // if the annotation spans the seam of the plasmid
       if (annotation.start > annotation.end) {
         const isBetweenAnnotationStartAndEndofSequence =
@@ -70,13 +101,10 @@ export const getAnnotatedSequence = ({
     .map(mapFn)
     .filter((x) => x.base !== " "); // remove padding
   const annotatedSequence = annotatedSequenceSchema.safeParse(raw);
-  if (noValidate) {
-    if (annotatedSequence.success === false) {
-      console.warn(annotatedSequence.error);
-    }
-    return raw as unknown as AnnotatedSequence;
-  }
   if (annotatedSequence.success === false) {
+    if (mode === "recover") {
+      return [];
+    }
     throw new Error(annotatedSequence.error.message);
   }
   return annotatedSequence.data;

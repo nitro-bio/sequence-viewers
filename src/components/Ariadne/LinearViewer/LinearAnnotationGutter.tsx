@@ -22,12 +22,15 @@ export const LinearAnnotationGutter = ({
   return (
     <div
       className={classNames(
-        "grid-rows-auto block grid grid-cols-1 gap-1",
+        "nsv-root nsv:grid-rows-auto nsv:block nsv:grid nsv:grid-cols-1 nsv:gap-1",
         containerClassName,
       )}
     >
       {stacks.map((annotations, stackIdx) => (
-        <div key={`annotation-stack-${stackIdx}`} className="relative h-8">
+        <div
+          key={`annotation-stack-${stackIdx}`}
+          className="nsv:relative nsv:h-8"
+        >
           {annotations.map((annotation) => (
             <LinearAnnotation
               key={`annotation-${annotation.text}-${annotation.start}-${annotation.end}-${annotation.direction}`}
@@ -92,7 +95,7 @@ const LinearAnnotation = ({
   const reverseClipPath = "polygon(0 50%, 10% 0, 100% 0, 100% 100%, 10% 100%)";
   return (
     <div
-      className="group absolute"
+      className="nsv:group nsv:absolute"
       style={{
         marginLeft: `${xPerc}%`,
         width: `${annotationRectangleWidthPerc}%`,
@@ -103,8 +106,10 @@ const LinearAnnotation = ({
     >
       <div
         className={classNames(
-          "px-2",
-          annotation.direction === "forward" ? "text-left" : "text-right",
+          "nsv:px-2",
+          annotation.direction === "forward"
+            ? "nsv:text-left"
+            : "nsv:text-right",
           annotation.className,
         )}
         style={{
@@ -118,7 +123,7 @@ const LinearAnnotation = ({
       </div>
       <div
         className={classNames(
-          "absolute left-1/2 z-10 hidden -translate-x-1/2 translate-y-4 flex-col rounded-md px-2 py-1 text-sm group-hover:flex",
+          "nsv:absolute nsv:left-1/2 nsv:z-10 nsv:hidden nsv:[translate:-50%_1rem] nsv:flex-col nsv:rounded-md nsv:px-2 nsv:py-1 nsv:text-[0.875rem]/[1.25rem] nsv:group-hover:flex",
           annotation.className,
         )}
       >

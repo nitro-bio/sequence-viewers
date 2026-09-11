@@ -1,3 +1,7 @@
+packages:
+  - "."
+  - "e2e/react19"
+
 allowBuilds:
   '@parcel/watcher@2.5.1': true
   '@tailwindcss/oxide@4.1.11': true

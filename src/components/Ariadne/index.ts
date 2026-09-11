@@ -7,3 +7,5 @@ export * from "./genbankUtils";
 export * from "./hooks";
 export * from "./schemas";
 export * from "./types";
+export { ViewerValidationError } from "./validation";
+export type { ValidationMode } from "./validation";

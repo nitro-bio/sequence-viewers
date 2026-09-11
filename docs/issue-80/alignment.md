@@ -84,11 +84,25 @@ a restrictive policy needs to allow:
   `script-src`.
 
 For same-origin self-hosting, the asset-origin entries are normally `'self'`.
-Test the policy in every supported browser because CSP fallback behavior for
-workers varies when `worker-src` is omitted. These directives were derived from
-the installed Aioli worker implementation and browser CSP rules; the packed
-browser smoke test blocks the public CDN and proves same-origin asset loading,
-but does not impose a production CSP header.
+The packed browser smoke test verifies the following policy in Chromium while
+blocking the public CDN:
+
+```text
+default-src 'none';
+script-src 'self' 'wasm-unsafe-eval';
+worker-src blob:;
+connect-src 'self';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data:;
+font-src 'self';
+base-uri 'none';
+object-src 'none'
+```
+
+The worker, tool JavaScript, and WebAssembly all load and a real MAFFT alignment
+finishes under that policy. Chromium was the only browser exercised by this
+smoke test. Test the policy in every supported browser because CSP fallback
+behavior varies, especially when `worker-src` is omitted.
 
 ## Completion and failures
 

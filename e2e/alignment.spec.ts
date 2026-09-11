@@ -118,3 +118,53 @@ test("self-hosted assets run a real alignment with public CDN blocked", async ({
     ].sort(),
   );
 });
+
+test("self-hosted alignment runs under a restrictive CSP", async ({ page }) => {
+  const csp = [
+    "default-src 'none'",
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "worker-src blob:",
+    "connect-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "base-uri 'none'",
+    "object-src 'none'",
+  ].join("; ");
+  const publicCdnRequests: string[] = [];
+
+  await page.route("**/*", async (route) => {
+    if (!route.request().isNavigationRequest()) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      headers: {
+        ...response.headers(),
+        "content-security-policy": csp,
+      },
+    });
+  });
+  await page.route("https://biowasm.com/**", async (route) => {
+    publicCdnRequests.push(route.request().url());
+    await route.abort();
+  });
+
+  await page.goto("/?alignment=self-hosted");
+  await page.getByRole("button", { name: "Align" }).click();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { alignmentUpdates: string[][] })
+              .alignmentUpdates.length,
+        ),
+      { timeout: 90_000 },
+    )
+    .toBe(1);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(publicCdnRequests).toEqual([]);
+});

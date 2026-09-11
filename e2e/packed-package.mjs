@@ -49,6 +49,15 @@ if (
   throw new Error("React peer contract changed");
 if (manifest.dependencies.react || manifest.dependencies["react-dom"])
   throw new Error("React must remain a peer");
+if (
+  Object.keys(manifest.dependencies).some((name) =>
+    name.includes("tailwindcss"),
+  )
+) {
+  throw new Error(
+    "Tailwind build tooling must remain a development dependency",
+  );
+}
 const browserBundle = await readFile(
   join(packagePath, "dist/nitro-sequence-viewers.es.js"),
   "utf8",

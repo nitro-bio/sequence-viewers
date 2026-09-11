@@ -17,9 +17,6 @@ importers:
       '@radix-ui/react-slot':
         specifier: ^1.2.3
         version: 1.2.3(@types/react@18.3.17)(react@18.3.1)
-      '@tailwindcss/vite':
-        specifier: ^4.1.11
-        version: 4.1.11(vite@5.4.11(@types/node@22.7.5)(lightningcss@1.30.1)(terser@5.43.1))
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -60,6 +57,9 @@ importers:
       '@tailwindcss/cli':
         specifier: ^4.1.11
         version: 4.1.11
+      '@tailwindcss/vite':
+        specifier: ^4.1.11
+        version: 4.1.11(vite@5.4.11(@types/node@22.7.5)(lightningcss@1.30.1)(terser@5.43.1))
       '@testing-library/jest-dom':
         specifier: ^6.6.3
         version: 6.6.3

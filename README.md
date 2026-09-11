@@ -31,6 +31,10 @@ stylesheet for compatibility.
 
 The library stylesheet provides component styles without resetting your host
 page. **Provide your own application reset if your application needs one.**
+Consumers do not need Tailwind installed: this package ships compiled CSS. The
+library builds with Tailwind v4 and targets Safari 16.4+, Chrome 111+, and Firefox
+128+ ([browser requirements](https://tailwindcss.com/docs/compatibility)).
+
 Library utilities and theme variables use the `nsv` prefix. Caller-provided class
 strings are preserved verbatim; define those classes in your own CSS or compile
 them with your application's Tailwind configuration. See the

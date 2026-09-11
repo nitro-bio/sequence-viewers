@@ -58,6 +58,14 @@ if (
     "Tailwind build tooling must remain a development dependency",
   );
 }
+for (const guide of ["alignment", "css-isolation", "validation"]) {
+  const migrationGuide = await readFile(
+    join(packagePath, `docs/issue-80/${guide}.md`),
+    "utf8",
+  );
+  if (!migrationGuide.trim())
+    throw new Error(`Missing packed migration guide: ${guide}`);
+}
 const browserBundle = await readFile(
   join(packagePath, "dist/nitro-sequence-viewers.es.js"),
   "utf8",

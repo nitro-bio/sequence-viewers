@@ -119,6 +119,17 @@ export function App() {
           containerClassName="caller-circular"
         />
       </section>
+      <section data-testid="recoverable-diagnostic">
+        <SequenceViewer
+          sequences={["ACGT"]}
+          annotations={[{ ...annotations[0], start: Number.NaN }]}
+          selection={null}
+          setSelection={setSelection}
+          charClassName={() => ""}
+          hideMetadataBar
+          containerClassName="caller-container"
+        />
+      </section>
       <section data-testid="standalone-ticks">
         <ReferenceTicks
           sequence={getAnnotatedSequence({

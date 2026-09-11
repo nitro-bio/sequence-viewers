@@ -83,7 +83,10 @@
     "react-dom": "^18.2.0 || ^19.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs/issue-80/alignment.md",
+    "docs/issue-80/css-isolation.md",
+    "docs/issue-80/validation.md"
   ],
   "styles": "./dist/nitro-sequence-viewers.css",
   "module": "./dist/nitro-sequence-viewers.es.js",

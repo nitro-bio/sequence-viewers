@@ -138,6 +138,16 @@ async function expectViewerStyles(page: Page) {
       .evaluate((element) => getComputedStyle(element).color),
   ).not.toBe(hostThemeColor);
 
+  const diagnostic = page
+    .getByTestId("recoverable-diagnostic")
+    .getByRole("status");
+  await expect(diagnostic).toBeVisible();
+  await expect(diagnostic.locator("ul")).toHaveCSS("margin-top", "0px");
+  await expect(diagnostic.locator("ul")).toHaveCSS("margin-bottom", "0px");
+  await expect(diagnostic.locator("ul")).toHaveCSS("padding-left", "20px");
+  await expect(diagnostic.locator("ul")).toHaveCSS("list-style-type", "disc");
+  await expect(diagnostic.locator("..")).toHaveClass(/caller-container/);
+
   const ticks = page.getByTestId("standalone-ticks");
   await expect(ticks.locator(":scope > .nsv-root")).toHaveCSS(
     "box-sizing",

@@ -241,7 +241,10 @@ const CircularSelection = ({
         const prevLength = currentSelection
           ? Math.abs(currentSelection.end - currentSelection.start)
           : 0;
-        const newLength = getSubsequenceLength({ start, end, direction });
+        const newLength = getSubsequenceLength(
+          { start, end, direction },
+          latestSequenceLength.current,
+        );
         const deltaLength = Math.abs(prevLength - newLength);
         const deltaThreshold = Math.max(0.7 * latestSequenceLength.current, 10);
         if (deltaLength > deltaThreshold && currentSelection) {

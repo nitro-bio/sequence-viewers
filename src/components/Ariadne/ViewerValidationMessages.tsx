@@ -23,7 +23,7 @@ export const ViewerValidationMessages = ({
           ? "Unable to display sequence data."
           : "Some annotations were not displayed."}
       </p>
-      <ul>
+      <ul className="nsv:m-0 nsv:list-disc nsv:pl-5">
         {diagnostics.map((diagnostic, diagnosticIndex) => (
           <li
             key={`${diagnostic.kind}-${diagnostic.index ?? "all"}-${diagnosticIndex}`}

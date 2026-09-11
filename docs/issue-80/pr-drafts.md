@@ -24,7 +24,7 @@ Consumers must provide their own application reset. Caller class strings remain 
 
 Passing an editing callback implicitly enabled alignment and executable asset downloads. Require `enableAlignment`, forward `alignmentConfig`, and initialize the toolchain only when the action runs. Apply successful output once from operation completion, preserve record association, and reject obsolete results when inputs change. Surface accessible errors and allow retry.
 
-Consumers that use alignment must now pass `enableAlignment` and a sequence update callback. The default CDN serves pinned tool versions; npm installation does not remove runtime tool-asset downloads. Applications can self-host the documented assets and configure their origin. Validation includes mocked lifecycle tests and a distinct real self-hosted browser smoke test.
+Consumers that use alignment must now pass `enableAlignment` and a sequence update callback. The default CDN serves pinned tool versions; npm installation does not remove runtime tool-asset downloads. Applications can self-host the documented assets and configure their origin before the first run. Aioli has no supported reconfiguration or termination API, so later configuration changes require an explicit remount; command failures reuse the initialized client for retries. Validation includes mocked lifecycle tests and a distinct real self-hosted browser smoke test.
 
 ## Recoverable structural validation (major)
 

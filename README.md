@@ -95,6 +95,10 @@ Opt in explicitly and supply an update callback:
 `alignmentConfig` accepts `urlCDN?: string` and `debug?: boolean` (default `false`).
 An enabled viewer without an update callback shows a disabled alignment action.
 Assets and Aioli initialization remain lazy until an alignment action runs.
+Choose the configuration before the first alignment. Aioli 3.2.1 has no supported
+reconfiguration or worker-termination API; changing an initialized viewer's
+configuration requires remounting it. The viewer reports this locally instead of
+silently allocating another worker.
 
 By default, alignment fetches executable JavaScript and WebAssembly tool assets
 from `https://biowasm.com/cdn/v3`: MAFFT **7.520** (`tbfast`, `dvtditr`) and

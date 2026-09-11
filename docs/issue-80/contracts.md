@@ -1,7 +1,7 @@
 # Issue 80 execution contracts
 
 - Source baseline: `ddb06c008717d225019a15785eb56fb6f9dacaeb` (current origin/main on 2026-09-11). Issue 80 open, no comments.
-- Original checkout: `/Users/nishantjha/Desktop/sequence-viewers`, left on main. All implementation lives in separate worktrees exposed at `.worktrees/` (physical root `/private/tmp/sequence-viewers-80-worktrees`).
+- Original checkout: `/Users/nishantjha/Desktop/sequence-viewers`, left on main. All implementation lives in separate worktrees exposed at `.worktrees/` (permanent root `/Users/nishantjha/Desktop/sequence-viewers/.worktrees`; temporary paths retained as compatibility symlinks).
 - Four implementation streams use `gpt-5.6-sol`, `xhigh`; at most three concurrent implementers plus coordinator due to four total slots. Independent final reviewer uses the same requested configuration.
 - Package manager: pnpm 11.9.0. Coordinator owns package.json, pnpm-lock.yaml, Vite/test configuration, release setup and CI. Dependencies are shared via integration node_modules; workers request additions.
 - Library-owned Tailwind prefix: `nsv:` (Tailwind v4 prefix syntax), including variants such as `nsv:hover:*`. Library scope marker: `nsv-root`; portal scope marker: `nsv-portal`. Caller-provided strings must remain verbatim. CSS worker coordinates final sweep after integration.
@@ -21,4 +21,4 @@
 | Main JS     | c804eb6eb7bff98bfca6a54ab2e41fbd11bc1e1e361add8be953921331d52de0 |
 | Aioli chunk | 59c9c594cd0a4e1e0ac8a282b22706d0fbc852d85c9999a50baf76a520952e1f |
 
-Published tarball shasum: `956d14c33e8ece12b3f2c427379a4a3ff0f7025e`. Both published and fresh output retain process.env, Generated unique file name logging, and the existing Alignment failed state. Source imports complete Tailwind preflight, has the reported memo/listener/selection defects, applies alignment from metadata effects, and runs safeParse even with noValidate. Public alphabet schemas remain supported exports. Baseline logs and tarball are at `/private/tmp/sequence-viewers-80-evidence`.
+Published tarball shasum: `956d14c33e8ece12b3f2c427379a4a3ff0f7025e`. Both published and fresh output retain process.env, Generated unique file name logging, and the existing Alignment failed state. Source imports complete Tailwind preflight, has the reported memo/listener/selection defects, applies alignment from metadata effects, and runs safeParse even with noValidate. Public alphabet schemas remain supported exports. Baseline logs and tarball are preserved at `/Users/nishantjha/Desktop/sequence-viewers/.worktrees/evidence`.

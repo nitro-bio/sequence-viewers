@@ -144,10 +144,12 @@ export const LinearViewer = (props: Props) => {
 
   if (validation.hasUnsafeSequenceData) {
     return (
-      <ViewerValidationMessages
-        diagnostics={validation.diagnostics}
-        sequenceUnavailable
-      />
+      <div className={classNames("nsv-root", containerClassName)}>
+        <ViewerValidationMessages
+          diagnostics={validation.diagnostics}
+          sequenceUnavailable
+        />
+      </div>
     );
   }
   if (!hasSequenceData) {
@@ -320,11 +322,13 @@ const LinearSelection = ({
   selectionClassName?: (selection: AriadneSelection) => string;
 }) => {
   const latestSelection = useRef(selection);
+  const latestSequenceLength = useRef(sequence.length);
   const latestSetSelection = useRef(setSelection);
   useEffect(() => {
     latestSelection.current = selection;
+    latestSequenceLength.current = sequence.length;
     latestSetSelection.current = setSelection;
-  }, [selection, setSelection]);
+  }, [selection, setSelection, sequence.length]);
   const {
     start: internalSelectionStart,
     end: internalSelectionEnd,
@@ -339,10 +343,10 @@ const LinearSelection = ({
       ) {
         const svgWidth = selectionRef.current?.getBoundingClientRect().width;
         const start = Math.floor(
-          (internalSelectionStart.x / svgWidth) * sequence.length,
+          (internalSelectionStart.x / svgWidth) * latestSequenceLength.current,
         );
         const end = Math.floor(
-          (internalSelectionEnd.x / svgWidth) * sequence.length,
+          (internalSelectionEnd.x / svgWidth) * latestSequenceLength.current,
         );
 
         // show a very small first selection result as start === end because the user probably doesn't want the entire sequence to be highlighted every time they click
@@ -367,7 +371,6 @@ const LinearSelection = ({
       internalSelectionEnd,
       internalSelectionStart,
       selectionRef,
-      sequence.length,
     ],
   );
 

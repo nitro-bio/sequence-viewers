@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import {
   CircularViewer,
   LinearViewer,
+  LinearAnnotationGutter,
+  ReferenceTicks,
+  getAnnotatedSequence,
   SequenceViewer,
   type Annotation,
   type AriadneSelection,
@@ -114,6 +117,26 @@ export function App() {
           selection={selection}
           setSelection={setSelection}
           containerClassName="caller-circular"
+        />
+      </section>
+      <section data-testid="standalone-ticks">
+        <ReferenceTicks
+          sequence={getAnnotatedSequence({
+            sequence: sequences[0],
+            stackedAnnotations: [],
+          })}
+        />
+      </section>
+      <section data-testid="standalone-gutter">
+        <LinearAnnotationGutter
+          sequence={getAnnotatedSequence({
+            sequence: sequences[0],
+            stackedAnnotations: [],
+          })}
+          stackedAnnotations={annotations.map((annotation) => ({
+            ...annotation,
+            stack: 0,
+          }))}
         />
       </section>
       <output data-testid="sequence-output">{JSON.stringify(sequences)}</output>

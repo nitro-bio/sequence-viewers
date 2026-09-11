@@ -196,7 +196,7 @@ export const useCircularSelectionRect = (
 
   useEffect(
     function determineDirection() {
-      if (start && end && direction === null) {
+      if (active.current && start && end && direction === null) {
         const startAngle = start.degrees;
         const endAngle = end.degrees;
         const delta = endAngle - startAngle;

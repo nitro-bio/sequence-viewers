@@ -267,6 +267,41 @@ describe("viewer validation boundaries", () => {
     expect(charClassName).not.toHaveBeenCalled();
   });
 
+  test.each(["sequence", "linear", "circular"])(
+    "%s keeps diagnostics and unsafe placeholders inside the caller container",
+    (viewer) => {
+      const element = (unsafe: boolean) => {
+        const props = {
+          containerClassName: "caller-layout",
+          annotations: [invalidAnnotation],
+          ...viewerCallbacks,
+        };
+        const sequence = unsafe ? (42 as unknown as string) : "ACGT";
+        return viewer === "sequence" ? (
+          <SequenceViewer
+            {...props}
+            sequences={[sequence]}
+            charClassName={() => ""}
+          />
+        ) : viewer === "linear" ? (
+          <LinearViewer {...props} sequences={[sequence]} />
+        ) : (
+          <CircularViewer {...props} sequence={sequence} />
+        );
+      };
+      const { container, rerender } = render(element(false));
+      const root = container.firstElementChild!;
+      expect(container.children).toHaveLength(1);
+      expect(root.classList.contains("caller-layout")).toBe(true);
+      expect(root.contains(screen.getByRole("status"))).toBe(true);
+      rerender(element(true));
+      expect(container.children).toHaveLength(1);
+      expect(container.firstElementChild).toBe(root);
+      expect(root.classList.contains("nsv-root")).toBe(true);
+      expect(root.contains(screen.getByRole("alert"))).toBe(true);
+    },
+  );
+
   test("strict mode throws the dedicated validation error", () => {
     const reactError = vi.spyOn(console, "error").mockImplementation(() => {});
 

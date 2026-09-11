@@ -115,10 +115,14 @@ export const CircularViewer = ({
 
   if (validation.hasUnsafeSequenceData) {
     return (
-      <ViewerValidationMessages
-        diagnostics={validation.diagnostics}
-        sequenceUnavailable
-      />
+      <div
+        className={classNames("nsv-root nsv-circular-root", containerClassName)}
+      >
+        <ViewerValidationMessages
+          diagnostics={validation.diagnostics}
+          sequenceUnavailable
+        />
+      </div>
     );
   }
 
@@ -201,11 +205,13 @@ const CircularSelection = ({
   annotatedSequence: AnnotatedSequence;
 }) => {
   const latestSelection = useRef(selection);
+  const latestSequenceLength = useRef(annotatedSequence.length);
   const latestSetSelection = useRef(setSelection);
   useEffect(() => {
     latestSelection.current = selection;
+    latestSequenceLength.current = annotatedSequence.length;
     latestSetSelection.current = setSelection;
-  }, [selection, setSelection]);
+  }, [selection, setSelection, annotatedSequence.length]);
   /* Collect internal selection data and propogate up */
   const {
     start: internalSelectionStart,
@@ -222,11 +228,11 @@ const CircularSelection = ({
       ) {
         const start = findIndexFromAngle({
           angle: internalSelectionStart,
-          seqLength: annotatedSequence.length,
+          seqLength: latestSequenceLength.current,
         });
         const end = findIndexFromAngle({
           angle: internalSelectionEnd,
-          seqLength: annotatedSequence.length,
+          seqLength: latestSequenceLength.current,
         });
         const direction =
           internalDirection === "clockwise" ? "forward" : "reverse";
@@ -235,12 +241,9 @@ const CircularSelection = ({
         const prevLength = currentSelection
           ? Math.abs(currentSelection.end - currentSelection.start)
           : 0;
-        const newLength = getSubsequenceLength(
-          { start, end, direction },
-          annotatedSequence.length,
-        );
+        const newLength = getSubsequenceLength({ start, end, direction });
         const deltaLength = Math.abs(prevLength - newLength);
-        const deltaThreshold = Math.max(0.7 * annotatedSequence.length, 10);
+        const deltaThreshold = Math.max(0.7 * latestSequenceLength.current, 10);
         if (deltaLength > deltaThreshold && currentSelection) {
           // preserve initial direction
           latestSetSelection.current({
@@ -259,7 +262,6 @@ const CircularSelection = ({
       }
     },
     [
-      annotatedSequence.length,
       internalDirection,
       internalSelectionEnd,
       internalSelectionStart,

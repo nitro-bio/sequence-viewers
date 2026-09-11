@@ -11,7 +11,7 @@ export const ReferenceTicks = ({
   return (
     <div
       className={classNames(
-        "nsv:overflow-hidden nsv:text-white nsv:flex",
+        "nsv-root nsv:overflow-hidden nsv:text-white nsv:flex",
         className,
       )}
     >

@@ -13,7 +13,7 @@ export const ViewerValidationMessages = ({
 
   return (
     <div
-      className="nsv-root nsv:rounded nsv:[border-width:1px] nsv:border-amber-500 nsv:p-2 nsv:text-[0.875rem]/[1.25rem]"
+      className="nsv-root nsv:w-full nsv:rounded nsv:[border-width:1px] nsv:border-amber-500 nsv:p-2 nsv:text-[0.875rem]/[1.25rem]"
       role={sequenceUnavailable ? "alert" : "status"}
       aria-live={sequenceUnavailable ? "assertive" : "polite"}
       data-nsv-validation="diagnostic"

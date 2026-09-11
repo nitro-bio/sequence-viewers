@@ -224,10 +224,14 @@ export const SequenceViewer = ({
 
   if (validation.hasUnsafeSequenceData) {
     return (
-      <ViewerValidationMessages
-        diagnostics={validation.diagnostics}
-        sequenceUnavailable
-      />
+      <div
+        className={classNames("nsv-root nsv-sequence-root", containerClassName)}
+      >
+        <ViewerValidationMessages
+          diagnostics={validation.diagnostics}
+          sequenceUnavailable
+        />
+      </div>
     );
   }
 
@@ -242,34 +246,32 @@ export const SequenceViewer = ({
     );
   }
   return (
-    <>
+    <div
+      className={classNames("nsv-root nsv-sequence-root", containerClassName)}
+    >
       <ViewerValidationMessages diagnostics={validation.diagnostics} />
-      <div
-        className={classNames("nsv-root nsv-sequence-root", containerClassName)}
-      >
-        {!hideMetadataBar && (
-          <SeqMetadataBar
-            hoveredPosition={hoveredPosition}
-            activeAnnotation={activeAnnotation}
-            className="nsv:sticky nsv:inset-x-0 nsv:top-0 nsv:z-3 nsv:w-full nsv:px-2 nsv:py-1 nsv:[backdrop-filter:blur(12px)]"
-            annotatedSequences={annotatedSequences}
-            charClassName={charClassName}
-            seqIdxToCopy={safeSeqIdxToCopy}
-            setSeqIdxToCopy={setSeqIdxToCopy}
-            selection={displayedSelection}
-            hideDownloadButton={hideDownloadButton}
-            alignmentEnabled={enableAlignment}
-            alignmentHasInput={hasAlignmentInput}
-            alignmentCanUpdate={Boolean(setSequences)}
-            onAlign={runAlignment}
-            alignState={alignState}
-          />
-        )}
-        <div className="nsv:flex nsv:flex-wrap nsv:px-2">
-          {memoizedSeqContent}
-        </div>
+      {!hideMetadataBar && (
+        <SeqMetadataBar
+          hoveredPosition={hoveredPosition}
+          activeAnnotation={activeAnnotation}
+          className="nsv:sticky nsv:inset-x-0 nsv:top-0 nsv:z-3 nsv:w-full nsv:px-2 nsv:py-1 nsv:[backdrop-filter:blur(12px)]"
+          annotatedSequences={annotatedSequences}
+          charClassName={charClassName}
+          seqIdxToCopy={safeSeqIdxToCopy}
+          setSeqIdxToCopy={setSeqIdxToCopy}
+          selection={displayedSelection}
+          hideDownloadButton={hideDownloadButton}
+          alignmentEnabled={enableAlignment}
+          alignmentHasInput={hasAlignmentInput}
+          alignmentCanUpdate={Boolean(setSequences)}
+          onAlign={runAlignment}
+          alignState={alignState}
+        />
+      )}
+      <div className="nsv:flex nsv:flex-wrap nsv:px-2">
+        {memoizedSeqContent}
       </div>
-    </>
+    </div>
   );
 };
 export const SeqContent = ({

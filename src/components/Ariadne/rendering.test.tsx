@@ -104,6 +104,47 @@ describe("stable rendering inputs", () => {
     expect(stackingFn).toHaveBeenCalledTimes(initialCallCount);
   });
 
+  test.each(["sequence", "linear", "circular"])(
+    "does not regenerate %s bases for a fresh empty annotation array",
+    (viewer) => {
+      const sequences = ["ACGT"];
+      const callbacks = viewerCallbacks();
+      const charClassName = () => "";
+      const element = () => (
+        <StrictMode>
+          {viewer === "sequence" ? (
+            <SequenceViewer
+              sequences={sequences}
+              annotations={[]}
+              charClassName={charClassName}
+              hideMetadataBar
+              {...callbacks}
+            />
+          ) : viewer === "linear" ? (
+            <LinearViewer
+              sequences={sequences}
+              annotations={[]}
+              {...callbacks}
+            />
+          ) : (
+            <CircularViewer
+              sequence={sequences[0]}
+              annotations={[]}
+              {...callbacks}
+            />
+          )}
+        </StrictMode>
+      );
+      const { rerender } = render(element());
+      const initialCalls = utilitySpies.getAnnotatedSequence.mock.calls.length;
+      expect(initialCalls).toBeGreaterThan(0);
+      rerender(element());
+      expect(utilitySpies.getAnnotatedSequence).toHaveBeenCalledTimes(
+        initialCalls,
+      );
+    },
+  );
+
   test("restacks annotations when the maximum sequence length changes", () => {
     const annotations = [annotation];
     const callbacks = viewerCallbacks();
@@ -420,6 +461,48 @@ describe("empty and shrinking data", () => {
 });
 
 describe("callbacks, listeners, and shared data", () => {
+  test.each(["linear", "circular"])(
+    "%s does not replay a completed drag after sequence resizing",
+    (viewer) => {
+      const setSelection = vi.fn();
+      const element = (sequence: string) =>
+        viewer === "linear" ? (
+          <LinearViewer
+            sequences={[sequence]}
+            selection={null}
+            setSelection={setSelection}
+          />
+        ) : (
+          <CircularViewer
+            sequence={sequence}
+            selection={null}
+            setSelection={setSelection}
+          />
+        );
+      const { container, rerender } = render(element("ACGTACGT"));
+      const svg = container.querySelector("svg")!;
+      vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: 200,
+        bottom: 200,
+        width: 200,
+        height: 200,
+        toJSON: () => ({}),
+      });
+      fireEvent.mouseDown(svg, { clientX: 150, clientY: 100 });
+      fireEvent.mouseMove(svg, { clientX: 100, clientY: 150 });
+      const dragCalls = setSelection.mock.calls.length;
+      expect(dragCalls).toBeGreaterThan(0);
+      fireEvent.mouseUp(window);
+      expect(setSelection).toHaveBeenCalledTimes(dragCalls);
+      rerender(element("AC"));
+      expect(setSelection).toHaveBeenCalledTimes(dragCalls);
+    },
+  );
+
   test("uses the latest native selection callback", () => {
     const oldOnMouseDown = vi.fn();
     const newOnMouseDown = vi.fn();

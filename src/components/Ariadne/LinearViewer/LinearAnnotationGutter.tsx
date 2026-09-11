@@ -22,7 +22,7 @@ export const LinearAnnotationGutter = ({
   return (
     <div
       className={classNames(
-        "nsv:grid-rows-auto nsv:block nsv:grid nsv:grid-cols-1 nsv:gap-1",
+        "nsv-root nsv:grid-rows-auto nsv:block nsv:grid nsv:grid-cols-1 nsv:gap-1",
         containerClassName,
       )}
     >

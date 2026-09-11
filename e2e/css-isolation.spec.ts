@@ -138,6 +138,21 @@ async function expectViewerStyles(page: Page) {
       .evaluate((element) => getComputedStyle(element).color),
   ).not.toBe(hostThemeColor);
 
+  const ticks = page.getByTestId("standalone-ticks");
+  await expect(ticks.locator(":scope > .nsv-root")).toHaveCSS(
+    "box-sizing",
+    "border-box",
+  );
+  await expect(ticks.locator("p").first()).toHaveCSS("margin-top", "0px");
+  await expect(ticks.locator("p").first()).toHaveCSS("margin-bottom", "0px");
+  await expect(ticks.locator(":scope > div > div").first()).toHaveCSS(
+    "height",
+    "48px",
+  );
+  await expect(
+    page.getByTestId("standalone-gutter").locator(":scope > .nsv-root"),
+  ).toHaveCSS("box-sizing", "border-box");
+
   await page.getByRole("combobox").click();
   const portal = page.locator(".nsv-portal");
   await expect(portal).toBeVisible();
@@ -159,10 +174,10 @@ for (const framework of frameworks) {
     }) => {
       await page.goto(`/?framework=${framework}`);
       await expect(page.getByTestId("host-heading")).toBeVisible();
-      await page.waitForFunction(
-        () =>
-          document.querySelector<HTMLLinkElement>('link[href*="host-"]')
-            ?.sheet !== null,
+      await page.waitForFunction(() =>
+        Boolean(
+          document.querySelector<HTMLLinkElement>('link[href*="host-"]')?.sheet,
+        ),
       );
       const before = await hostSnapshot(page);
 

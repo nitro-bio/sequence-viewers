@@ -149,7 +149,7 @@ describe("stable rendering inputs", () => {
         ...viewerCallbacks(),
       };
       const { rerender } = render(<SequenceViewer {...props} noValidate />);
-      expect(screen.getByRole("status")).toHaveTextContent("Annotation");
+      expect(screen.getByRole("status").textContent).toContain("Annotation");
       const reactError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});

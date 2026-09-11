@@ -138,6 +138,58 @@ describe("useMafftEinsi", () => {
     expect(onAligned).toHaveBeenCalledWith(["ACG", "A-G"]);
   });
 
+  test("keeps one worker and requires a remount after initialized configuration changes", async () => {
+    const client = makeClient(async (command) =>
+      command.startsWith("cat ")
+        ? outputForMountedFasta(client.getMountedFasta())
+        : "",
+    );
+    const AioliConstructor = installClient(client);
+    const onAligned = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ config }) =>
+        useMafftEinsi({ sequences: ["acg", "ag"], onAligned, config }),
+      {
+        initialProps: {
+          config: { urlCDN: "https://assets-a.example.test", debug: false },
+        },
+      },
+    );
+
+    rerender({
+      config: { urlCDN: "https://assets-b.example.test", debug: true },
+    });
+    await act(async () => result.current.run());
+    expect(result.current.state.status).toBe("done");
+    expect(AioliConstructor).toHaveBeenCalledOnce();
+    expect(AioliConstructor).toHaveBeenCalledWith(expect.any(Array), {
+      urlCDN: "https://assets-b.example.test",
+      debug: true,
+    });
+
+    rerender({
+      config: { urlCDN: "https://assets-c.example.test", debug: false },
+    });
+    expect(result.current.state.status).toBe("idle");
+
+    await act(async () => result.current.run());
+    expect(result.current.state).toMatchObject({
+      status: "error",
+      recovery: "remount",
+    });
+    expect(AioliConstructor).toHaveBeenCalledOnce();
+    expect(onAligned).toHaveBeenCalledOnce();
+
+    rerender({
+      config: { urlCDN: "https://assets-b.example.test", debug: true },
+    });
+    expect(result.current.state.status).toBe("idle");
+    await act(async () => result.current.run());
+
+    expect(AioliConstructor).toHaveBeenCalledOnce();
+    expect(onAligned).toHaveBeenCalledTimes(2);
+  });
+
   test("defaults Aioli debugging off and removes files created by the run", async () => {
     const client = makeClient(async (command) =>
       command.startsWith("cat ")
@@ -167,6 +219,23 @@ describe("useMafftEinsi", () => {
       "/shared/data/nsv-mafft-einsi-1.fa",
       "/shared/data/pre",
     ]);
+  });
+
+  test("reports FASTA delimiters without loading alignment tools", async () => {
+    const { result } = renderHook(() =>
+      useMafftEinsi({
+        sequences: ["A>A", "AAA"],
+        onAligned: vi.fn(),
+      }),
+    );
+
+    await act(async () => result.current.run());
+
+    expect(result.current.state).toMatchObject({
+      status: "error",
+      recovery: "change-input",
+    });
+    expect(mockedLoadAioli).not.toHaveBeenCalled();
   });
 
   test("uses the latest callback once when its identity changes during a run", async () => {
@@ -304,5 +373,58 @@ describe("useMafftEinsi", () => {
     });
     expect(caughtError).toBe(callbackError);
     expect(result.current.state.status).toBe("done");
+  });
+
+  test("clears settled failures when inputs, configuration, or enablement change", async () => {
+    const client = makeClient(async () => {
+      throw new Error("tool failed");
+    });
+    installClient(client);
+    const onAligned = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ sequences, config, enabled }) =>
+        useMafftEinsi({ sequences, onAligned, config, enabled }),
+      {
+        initialProps: {
+          sequences: ["acg", "ag"],
+          config: { urlCDN: "https://assets-a.example.test" },
+          enabled: true,
+        },
+      },
+    );
+
+    await act(async () => result.current.run());
+    expect(result.current.state.status).toBe("error");
+
+    rerender({
+      sequences: ["ttt", "tt"],
+      config: { urlCDN: "https://assets-a.example.test" },
+      enabled: true,
+    });
+    expect(result.current.state.status).toBe("idle");
+
+    await act(async () => result.current.run());
+    expect(result.current.state.status).toBe("error");
+    rerender({
+      sequences: ["ttt", "tt"],
+      config: { urlCDN: "https://assets-b.example.test" },
+      enabled: true,
+    });
+    expect(result.current.state.status).toBe("idle");
+
+    await act(async () => result.current.run());
+    expect(result.current.state.status).toBe("error");
+    rerender({
+      sequences: ["ttt", "tt"],
+      config: { urlCDN: "https://assets-b.example.test" },
+      enabled: false,
+    });
+    expect(result.current.state.status).toBe("idle");
+    rerender({
+      sequences: ["ttt", "tt"],
+      config: { urlCDN: "https://assets-b.example.test" },
+      enabled: true,
+    });
+    expect(result.current.state.status).toBe("idle");
   });
 });

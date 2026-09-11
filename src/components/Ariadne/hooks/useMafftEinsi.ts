@@ -7,7 +7,11 @@ export type AlignState =
   | { status: "idle" }
   | { status: "running" }
   | { status: "done" }
-  | { status: "error"; error: unknown };
+  | {
+      status: "error";
+      error: unknown;
+      recovery: "retry" | "change-input" | "remount";
+    };
 
 export interface AlignmentConfig {
   urlCDN?: string;
@@ -64,6 +68,13 @@ const sequencesAreEqual = (left: string[], right: string[]) =>
 
 const makeConfigKey = ({ urlCDN, debug = false }: AlignmentConfig) =>
   `${urlCDN ?? ""}\u0000${debug}`;
+
+const CONFIGURATION_CHANGED_ERROR = new Error(
+  "Alignment configuration changed after initialization.",
+);
+const INVALID_INPUT_ERROR = new Error(
+  "Alignment input cannot contain FASTA headers or line breaks.",
+);
 
 const makeFasta = (sequences: string[], recordIds: string[]) =>
   sequences
@@ -173,6 +184,11 @@ export function useMafftEinsi({
     if (!sequencesAreEqual(sequencesRef.current, sequences)) {
       sequencesRef.current = [...sequences];
       lifecycleRevisionRef.current += 1;
+      setState((current) =>
+        current.status === "running" || current.status === "idle"
+          ? current
+          : { status: "idle" },
+      );
     }
   }, [sequences]);
 
@@ -180,6 +196,11 @@ export function useMafftEinsi({
     if (makeConfigKey(configRef.current) !== makeConfigKey(config)) {
       configRef.current = { ...config };
       lifecycleRevisionRef.current += 1;
+      setState((current) =>
+        current.status === "running" || current.status === "idle"
+          ? current
+          : { status: "idle" },
+      );
     }
   }, [config]);
 
@@ -187,6 +208,11 @@ export function useMafftEinsi({
     if (enabledRef.current !== enabled) {
       enabledRef.current = enabled;
       lifecycleRevisionRef.current += 1;
+      setState((current) =>
+        current.status === "running" || current.status === "idle"
+          ? current
+          : { status: "idle" },
+      );
     }
   }, [enabled]);
 
@@ -201,19 +227,38 @@ export function useMafftEinsi({
     const inputSequences = [...sequencesRef.current];
     if (
       inputSequences.length === 0 ||
-      inputSequences.some(
-        (sequence) => sequence.length === 0 || /[\r\n>]/.test(sequence),
-      )
+      inputSequences.some((sequence) => sequence.length === 0)
     ) {
+      return;
+    }
+    if (inputSequences.some((sequence) => /[\r\n>]/.test(sequence))) {
+      if (mountedRef.current) {
+        setState({
+          status: "error",
+          error: INVALID_INPUT_ERROR,
+          recovery: "change-input",
+        });
+      }
+      return;
+    }
+
+    const operation = operationRef.current + 1;
+    const lifecycleRevision = lifecycleRevisionRef.current;
+    const operationConfig = { ...configRef.current };
+    const configKey = makeConfigKey(operationConfig);
+    if (clientRef.current && clientRef.current.configKey !== configKey) {
+      if (mountedRef.current) {
+        setState({
+          status: "error",
+          error: CONFIGURATION_CHANGED_ERROR,
+          recovery: "remount",
+        });
+      }
       return;
     }
 
     runningRef.current = true;
-    const operation = operationRef.current + 1;
     operationRef.current = operation;
-    const lifecycleRevision = lifecycleRevisionRef.current;
-    const operationConfig = { ...configRef.current };
-    const configKey = makeConfigKey(operationConfig);
     const recordIds = inputSequences.map(
       (_, index) => `nsv_alignment_${operation}_${index}`,
     );
@@ -225,7 +270,7 @@ export function useMafftEinsi({
     let cli: AioliClient | undefined;
     let filesBefore = new Set<string>();
     try {
-      if (!clientRef.current || clientRef.current.configKey !== configKey) {
+      if (!clientRef.current) {
         const promise = loadAioli().then((AioliConstructor) => {
           const aioliConfig = {
             debug: operationConfig.debug ?? false,
@@ -275,7 +320,7 @@ export function useMafftEinsi({
         setState(
           lifecycleRevisionRef.current === lifecycleRevision &&
             enabledRef.current
-            ? { status: "error", error }
+            ? { status: "error", error, recovery: "retry" }
             : { status: "idle" },
         );
       }

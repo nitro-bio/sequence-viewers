@@ -90,6 +90,28 @@ test("enabled alignment without an update callback explains why it is disabled",
   expect(mockedLoadAioli).not.toHaveBeenCalled();
 });
 
+test("invalid FASTA delimiters report an accessible input error", async () => {
+  render(
+    <SequenceViewer
+      {...viewerProps}
+      sequences={["A>A", "AAA"]}
+      setSequences={vi.fn()}
+      enableAlignment
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Align" }));
+
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Alignment input cannot contain FASTA headers or line breaks. Update the sequences before aligning.",
+  );
+  expect(
+    (screen.getByRole("button", { name: "Align" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  expect(mockedLoadAioli).not.toHaveBeenCalled();
+});
+
 test.each([[[]], [[""]]])(
   "empty sequences expose no alignment action",
   (sequences) => {
@@ -141,6 +163,41 @@ test("an alignment failure is announced and can be retried", async () => {
     expect(setSequences).toHaveBeenCalledWith(["ACG", "A-G"]),
   );
   expect(setSequences).toHaveBeenCalledOnce();
+});
+
+test("an initialized configuration change requires an accessible remount", async () => {
+  const client = makeClient();
+  const AioliConstructor = installClient(client);
+  const setSequences = vi.fn();
+  const { rerender } = render(
+    <SequenceViewer
+      {...viewerProps}
+      setSequences={setSequences}
+      enableAlignment
+      alignmentConfig={{ urlCDN: "https://assets-a.example.test" }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Align" }));
+  await waitFor(() => expect(setSequences).toHaveBeenCalledOnce());
+  rerender(
+    <SequenceViewer
+      {...viewerProps}
+      setSequences={setSequences}
+      enableAlignment
+      alignmentConfig={{ urlCDN: "https://assets-b.example.test" }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Align" }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Alignment configuration changed after initialization. Remount SequenceViewer to apply the new configuration.",
+  );
+  expect(
+    (screen.getByRole("button", { name: "Align" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  expect(AioliConstructor).toHaveBeenCalledOnce();
 });
 
 test("completion is applied after the metadata bar is hidden", async () => {

@@ -25,9 +25,17 @@ empty sequence have no alignment action. `debug` defaults to `false`.
 
 The Aioli JavaScript dependency is split into a lazy browser chunk. Creating a
 viewer, including an alignment-enabled viewer, does not initialize Aioli or
-fetch tools. The first Align action creates one worker for that viewer and
-configuration. The MAFFT programs load only when their commands run. Later
-retries reuse that client.
+fetch tools. The first Align action creates one worker for that mounted viewer
+using the current configuration. The MAFFT programs load only when their
+commands run. Later retries reuse that client.
+
+Aioli 3.2.1 accepts `urlCDN` and `debug` only while constructing its private
+worker. It exposes neither supported runtime configuration mutation nor a
+worker termination method. Changes to `alignmentConfig` made before the first
+Align action are used normally. After the worker initializes, the configuration
+is fixed for that mounted viewer. If it changes, alignment reports that the
+viewer must be remounted to apply the new configuration and does not create an
+additional worker.
 
 By default, Aioli loads executable assets from
 `https://biowasm.com/cdn/v3`. The exact pinned tools are:
@@ -121,6 +129,11 @@ the latest committed callback receives the result once. Consumer callback
 exceptions are not presented as alignment failures.
 
 Failures render an accessible alert and turn the action into Retry alignment.
+Sequences containing `>`, carriage returns, or line feeds cannot be embedded
+safely in the generated FASTA input. Selecting Align for such input reports an
+accessible error without loading Aioli; update the input sequences to continue.
+A committed input, configuration, or enablement change clears a settled success
+or failure message.
 The hook removes files created by each operation through Aioli's documented
 virtual filesystem API. Aioli 3.2.1 exposes no public worker termination method,
 so the client is retained and reused for the mounted viewer rather than calling

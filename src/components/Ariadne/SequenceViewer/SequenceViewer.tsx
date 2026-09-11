@@ -502,6 +502,15 @@ export const SeqMetadataBar = ({
   alignState: AlignState;
 }) => {
   const alignmentExplanationId = useId();
+  const alignmentError = alignState.status === "error" ? alignState : undefined;
+  const alignmentNeedsInputChange = alignmentError?.recovery === "change-input";
+  const alignmentNeedsRemount = alignmentError?.recovery === "remount";
+  const alignmentCannotRun = alignmentNeedsInputChange || alignmentNeedsRemount;
+  const alignmentErrorMessage = alignmentNeedsInputChange
+    ? "Alignment input cannot contain FASTA headers or line breaks. Update the sequences before aligning."
+    : alignmentNeedsRemount
+      ? "Alignment configuration changed after initialization. Remount SequenceViewer to apply the new configuration."
+      : "Alignment failed. Select Retry alignment to try again.";
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
@@ -563,14 +572,22 @@ export const SeqMetadataBar = ({
           <Button
             onClick={() => void onAlign()}
             size="xs"
-            disabled={!alignmentCanUpdate || alignState.status === "running"}
+            disabled={
+              !alignmentCanUpdate ||
+              alignState.status === "running" ||
+              alignmentCannotRun
+            }
             aria-describedby={
-              alignmentCanUpdate ? undefined : alignmentExplanationId
+              !alignmentCanUpdate || alignmentCannotRun
+                ? alignmentExplanationId
+                : undefined
             }
             title={
-              alignmentCanUpdate
-                ? undefined
-                : "Alignment needs setSequences to apply its result."
+              !alignmentCanUpdate
+                ? "Alignment needs setSequences to apply its result."
+                : alignmentCannotRun
+                  ? alignmentErrorMessage
+                  : undefined
             }
             className={classNames(
               "nsv:bg-sequences-foreground/10 nsv:hover:bg-sequences-foreground/30 nsv:text-sequences-foreground",
@@ -578,7 +595,7 @@ export const SeqMetadataBar = ({
               "nsv:[transition:color_150ms_ease,background-color_150ms_ease,border-color_150ms_ease,fill_150ms_ease,stroke_150ms_ease]",
             )}
           >
-            {alignState.status === "error" ? "Retry alignment" : "Align"}
+            {alignmentError?.recovery === "retry" ? "Retry alignment" : "Align"}
           </Button>
           {!alignmentCanUpdate && (
             <span
@@ -597,10 +614,15 @@ export const SeqMetadataBar = ({
       )}
       {alignmentEnabled && alignState.status === "error" && (
         <span
+          id={
+            alignmentCanUpdate && alignmentCannotRun
+              ? alignmentExplanationId
+              : undefined
+          }
           role="alert"
           className="nsv:ml-2 nsv:text-[0.75rem]/[1rem] nsv:text-red-500"
         >
-          Alignment failed. Select Retry alignment to try again.
+          {alignmentErrorMessage}
         </span>
       )}
       <CopyDisplay

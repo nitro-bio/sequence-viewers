@@ -251,9 +251,9 @@ export function useMafftEinsi({
       } catch {
         filesBefore = new Set();
       }
-      await cli.mount({
-        name: fileName,
-        data: makeFasta(inputSequences, recordIds),
+      await cli.write({
+        path: `${DATA_DIRECTORY}/${fileName}`,
+        buffer: new TextEncoder().encode(makeFasta(inputSequences, recordIds)),
       });
 
       await cli.exec(

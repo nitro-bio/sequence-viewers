@@ -30,9 +30,8 @@ const outputForMountedFasta = (fasta: string) => {
 const makeClient = (exec: (command: string) => Promise<string>) => {
   let mountedFasta = "";
   const client = {
-    mount: vi.fn(async ({ data }: { name: string; data: string }) => {
-      mountedFasta = data;
-      return [];
+    write: vi.fn(async ({ buffer }: { path: string; buffer: Uint8Array }) => {
+      mountedFasta = new TextDecoder().decode(buffer);
     }),
     exec: vi.fn(exec),
     fs: {

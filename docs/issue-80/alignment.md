@@ -38,8 +38,8 @@ By default, Aioli loads executable assets from
 
 Installing `@biowasm/aioli` from npm supplies the worker controller, not these
 tool assets. With the default configuration, the browser still downloads the
-JavaScript and WebAssembly executables from Biowasm. Sequence data is mounted
-inside the browser worker and alignment runs locally; it is not sent to an
+JavaScript and WebAssembly executables from Biowasm. Sequence data is written
+to the browser worker's virtual filesystem and alignment runs locally; it is not sent to an
 alignment service.
 
 ## Self-hosting

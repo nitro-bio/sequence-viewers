@@ -4,6 +4,14 @@ declare module "@biowasm/aioli" {
     data: string;
   }
 
+  export interface WriteOptions {
+    path: string;
+    buffer: Uint8Array;
+    flag?: string;
+    offset?: number;
+    position?: number;
+  }
+
   export interface ToolConfig {
     tool: string;
     version: string;
@@ -26,6 +34,7 @@ declare module "@biowasm/aioli" {
 
   export interface Aioli {
     mount(options: MountOptions | MountOptions[]): Promise<string[]>;
+    write(options: WriteOptions): Promise<void>;
     exec(command: string): Promise<string>;
     fs: FileSystem;
   }

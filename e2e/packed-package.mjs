@@ -213,11 +213,19 @@ await build({
     alias: [
       {
         find: /^react(?=\/|$)/,
-        replacement: dirname(require.resolve("react19/package.json")),
+        replacement: dirname(
+          require.resolve("react/package.json", {
+            paths: [join(root, "e2e/react19")],
+          }),
+        ),
       },
       {
         find: /^react-dom(?=\/|$)/,
-        replacement: dirname(require.resolve("react-dom19/package.json")),
+        replacement: dirname(
+          require.resolve("react-dom/package.json", {
+            paths: [join(root, "e2e/react19")],
+          }),
+        ),
       },
     ],
   },

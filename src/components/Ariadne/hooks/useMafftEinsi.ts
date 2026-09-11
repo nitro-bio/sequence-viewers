@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { loadAioli } from "@utils/loadAioli";
 
 import type { Aioli as AioliClient } from "@biowasm/aioli";
+
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export type AlignState =
   | { status: "idle" }
@@ -175,7 +184,7 @@ export function useMafftEinsi({
   const configRef = useRef<AlignmentConfig>({ ...config });
   const enabledRef = useRef(enabled);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -183,7 +192,7 @@ export function useMafftEinsi({
     };
   }, []);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!sequencesAreEqual(sequencesRef.current, sequences)) {
       sequencesRef.current = [...sequences];
       lifecycleRevisionRef.current += 1;
@@ -195,7 +204,7 @@ export function useMafftEinsi({
     }
   }, [sequences]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (makeConfigKey(configRef.current) !== makeConfigKey(config)) {
       configRef.current = { ...config };
       lifecycleRevisionRef.current += 1;
@@ -207,7 +216,7 @@ export function useMafftEinsi({
     }
   }, [config]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (enabledRef.current !== enabled) {
       enabledRef.current = enabled;
       lifecycleRevisionRef.current += 1;
@@ -219,7 +228,7 @@ export function useMafftEinsi({
     }
   }, [enabled]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     onAlignedRef.current = onAligned;
   }, [onAligned]);
 

@@ -193,6 +193,27 @@ await build({
     },
   },
 });
+// Exercise the second supported React peer major without adding React to the
+// published runtime dependencies. All React entrypoints share the same alias.
+await build({
+  configFile: false,
+  root: fixture,
+  base: "/react19/",
+  plugins: [react()],
+  resolve: {
+    alias: [
+      {
+        find: /^react(?=\/|$)/,
+        replacement: dirname(require.resolve("react19/package.json")),
+      },
+      {
+        find: /^react-dom(?=\/|$)/,
+        replacement: dirname(require.resolve("react-dom19/package.json")),
+      },
+    ],
+  },
+  build: { outDir: join(output, "dist/react19"), emptyOutDir: true },
+});
 console.log(
   `Verified packed artifact ${packed[0].filename}; consumer built at ${output}/dist`,
 );

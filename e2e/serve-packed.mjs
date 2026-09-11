@@ -20,7 +20,10 @@ createServer(async (req, res) => {
     res.writeHead(403).end();
     return;
   }
-  const file = path === root ? resolve(root, "index.html") : path;
+  const file =
+    path === root || new URL(req.url, "http://localhost").pathname.endsWith("/")
+      ? resolve(path, "index.html")
+      : path;
   try {
     const body = await readFile(file);
     res

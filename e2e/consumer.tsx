@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, version } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CircularViewer,
@@ -17,6 +17,7 @@ hostLink.href = `/host-${framework}.css`;
 document.head.append(hostLink);
 
 Object.assign(window, {
+  reactVersion: version,
   alignmentUpdates: [] as string[][],
   loadLibraryStyles: (order: "before" | "after") =>
     new Promise<void>((resolve, reject) => {

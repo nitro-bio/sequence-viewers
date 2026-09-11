@@ -170,16 +170,13 @@ export const SequenceViewer = ({
     <>
       <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <div
-        className={classNames(
-          "relative isolate flex flex-wrap",
-          containerClassName,
-        )}
+        className={classNames("nsv-root nsv-sequence-root", containerClassName)}
       >
         {!hideMetadataBar && (
           <SeqMetadataBar
             hoveredPosition={hoveredPosition}
             activeAnnotation={activeAnnotation}
-            className="sticky inset-x-0 top-0 z-3 w-full px-2 py-1 backdrop-blur-md"
+            className="nsv:sticky nsv:inset-x-0 nsv:top-0 nsv:z-3 nsv:w-full nsv:px-2 nsv:py-1 nsv:[backdrop-filter:blur(12px)]"
             annotatedSequences={annotatedSequences}
             charClassName={charClassName}
             seqIdxToCopy={seqIdxToCopy}
@@ -198,7 +195,9 @@ export const SequenceViewer = ({
             setSequences={setSequences}
           />
         )}
-        <div className="flex flex-wrap px-2">{memoizedSeqContent}</div>
+        <div className="nsv:flex nsv:flex-wrap nsv:px-2">
+          {memoizedSeqContent}
+        </div>
       </div>
     </>
   );
@@ -242,17 +241,17 @@ export const SeqContent = ({
     const isNotMultipleOfTen = base.index % 10 !== 0;
 
     if (isNotFirstSeq || isNotMultipleOfTen) {
-      return "opacity-0";
+      return "nsv:opacity-0";
     }
     return classNames(
-      "text-xs z-1",
+      "nsv:text-[0.75rem]/[1rem] nsv:z-1",
       baseInSelection({
         baseIndex: base.index,
         selection,
         sequenceLength: annotatedSequences[sequenceIdx].length,
       })
-        ? "text-sequences-primary group-hover:text-sequences-primary-muted"
-        : "text-sequences-foreground group-hover:text-sequences-primary",
+        ? "nsv:text-sequences-primary nsv:group-hover:text-sequences-primary-muted"
+        : "nsv:text-sequences-foreground nsv:group-hover:text-sequences-primary",
     );
   };
   const handleMouseUp = () => {
@@ -280,7 +279,7 @@ export const SeqContent = ({
         return (
           <div
             className={classNames(
-              "relative mt-4 flex flex-col justify-between",
+              "nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between",
             )}
             key={`base-${baseIdx}`}
           >
@@ -307,7 +306,9 @@ export const SeqContent = ({
                 return (
                   <div
                     key={`sequence-${sequenceIdx}-base-${baseIdx}`}
-                    className={classNames("text-center whitespace-nowrap")}
+                    className={classNames(
+                      "nsv:text-center nsv:whitespace-nowrap",
+                    )}
                     onMouseEnter={() => {
                       setHoveredPosition(base.index);
                       // if mouse is down, update selection
@@ -333,8 +334,8 @@ export const SeqContent = ({
                       char={`| ${base.index}`}
                       index={baseIdx}
                       charClassName={classNames(
-                        "absolute -top-4 left-0",
-                        "border-b",
+                        "nsv:absolute nsv:-top-4 nsv:left-0",
+                        "nsv:[border-bottom-width:1px]",
                         indicesClassName({
                           base,
                           sequenceIdx,
@@ -349,8 +350,9 @@ export const SeqContent = ({
                           base,
                           sequenceIdx,
                         }),
-                        isMisaligned && "!text-sequences-mismatch",
-                        ["-", " "].includes(base.base) && "!text-sequences-gap",
+                        isMisaligned && "nsv:text-sequences-mismatch!",
+                        ["-", " "].includes(base.base) &&
+                          "nsv:text-sequences-gap!",
                         baseInSelection({
                           baseIndex: baseIdx,
                           selection,
@@ -359,7 +361,7 @@ export const SeqContent = ({
                         }) &&
                           base.base !== " " &&
                           classNames(
-                            "bg-sequences-selection/20",
+                            "nsv-sequence-selection",
                             selectionClassName,
                           ),
                       )}
@@ -452,25 +454,25 @@ export const SeqMetadataBar = ({
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
-        "flex gap-1 rounded-full px-2 py-px text-xs opacity-100!",
-        "ml-2 truncate",
+        "nsv:flex nsv:gap-1 nsv:rounded-full nsv:px-2 nsv:py-px nsv:text-[0.75rem]/[1rem] nsv:opacity-100!",
+        "nsv:ml-2 nsv:truncate",
         activeAnnotation.className,
       )}
     >
-      <span className="flex gap-1">
-        <p className="opacity-70">Label: </p>
+      <span className="nsv:flex nsv:gap-1">
+        <p className="nsv:opacity-70">Label: </p>
         <p className="">{activeAnnotation.text}</p>
       </span>
-      <span className="flex gap-1">
-        <p className="opacity-70">Type: </p>
+      <span className="nsv:flex nsv:gap-1">
+        <p className="nsv:opacity-70">Type: </p>
         <p className="">{activeAnnotation.type}</p>
       </span>
-      <span className="flex gap-1">
-        <p className="opacity-70">Direction: </p>
+      <span className="nsv:flex nsv:gap-1">
+        <p className="nsv:opacity-70">Direction: </p>
         <p className="">{activeAnnotation.direction}</p>
       </span>
-      <span className="flex gap-1">
-        <p className="opacity-70">from</p>
+      <span className="nsv:flex nsv:gap-1">
+        <p className="nsv:opacity-70">from</p>
         <p className="">
           {activeAnnotation.start} - {activeAnnotation.end}
         </p>
@@ -478,14 +480,14 @@ export const SeqMetadataBar = ({
     </span>
   ) : null;
   const positionDisplay = (
-    <span className="text-sequences-foreground min-w-16 text-xs">
+    <span className="nsv:text-sequences-foreground nsv:min-w-16 nsv:text-[0.75rem]/[1rem]">
       Pos: {hoveredPosition ?? 0}
     </span>
   );
   return (
     <div
       className={classNames(
-        "flex h-8 items-center gap-2 py-1 text-xs",
+        "nsv:flex nsv:h-8 nsv:items-center nsv:gap-2 nsv:py-1 nsv:text-[0.75rem]/[1rem]",
         className,
       )}
     >
@@ -497,11 +499,11 @@ export const SeqMetadataBar = ({
           size="xs"
           variant="ghost"
           className={classNames(
-            "hover:bg-sequences-foreground/30 text-sequences-foreground",
-            "transition-colors",
+            "nsv:hover:bg-sequences-foreground/30 nsv:text-sequences-foreground",
+            "nsv:[transition:color_150ms_ease,background-color_150ms_ease,border-color_150ms_ease,fill_150ms_ease,stroke_150ms_ease]",
           )}
         >
-          <DownloadIcon className="size-3" />
+          <DownloadIcon className="nsv:size-3" />
         </Button>
       )}
 
@@ -511,16 +513,18 @@ export const SeqMetadataBar = ({
           size="xs"
           disabled={alignState?.status === "running"}
           className={classNames(
-            "bg-sequences-foreground/10 hover:bg-sequences-foreground/30 text-sequences-foreground",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            "transition-colors",
+            "nsv:bg-sequences-foreground/10 nsv:hover:bg-sequences-foreground/30 nsv:text-sequences-foreground",
+            "nsv:disabled:cursor-not-allowed nsv:disabled:opacity-50",
+            "nsv:[transition:color_150ms_ease,background-color_150ms_ease,border-color_150ms_ease,fill_150ms_ease,stroke_150ms_ease]",
           )}
         >
           Align
         </Button>
       )}
       {alignState?.status === "error" && (
-        <span className="ml-2 text-xs text-red-500">Alignment failed</span>
+        <span className="nsv:ml-2 nsv:text-[0.75rem]/[1rem] nsv:text-red-500">
+          Alignment failed
+        </span>
       )}
       <CopyDisplay
         annotatedSequences={annotatedSequences}
@@ -579,7 +583,9 @@ export const SequenceAnnotation = ({
             return (
               <div
                 key={`annotation-${index}-${i}`}
-                className={"h-3 border-b-2 opacity-10"}
+                className={
+                  "nsv:h-3 nsv:[border-bottom-width:2px] nsv:opacity-10"
+                }
               />
             );
           }
@@ -588,7 +594,7 @@ export const SequenceAnnotation = ({
             <div
               key={`annotation-${index}-${i}`}
               className={classNames(
-                "group/annotation h-3 border-black group-hover/annotation:border",
+                "nsv:group/annotation nsv:h-3 nsv:border-black nsv:group-hover/annotation:[border-width:1px]",
                 annotation.className,
               )}
               onClick={() =>
@@ -603,7 +609,9 @@ export const SequenceAnnotation = ({
             ></div>
           );
         } else {
-          return <div key={`placeholder-${index}-${i}`} className={"h-3"} />;
+          return (
+            <div key={`placeholder-${index}-${i}`} className={"nsv:h-3"} />
+          );
         }
       })}
     </div>
@@ -618,16 +626,18 @@ interface CharProps {
 
 export const CharComponent = ({ char, charClassName }: CharProps) => {
   // don't allow selection of chars
-  const sharedClassName = "font-mono select-none";
+  const sharedClassName = "nsv:font-mono nsv:select-none";
   if (char === " ") {
     return (
-      <div className={classNames(sharedClassName, charClassName, "opacity-20")}>
+      <div
+        className={classNames(sharedClassName, charClassName, "nsv:opacity-20")}
+      >
         .
       </div>
     );
   }
   return (
-    <div className={classNames(sharedClassName, charClassName, "mr-px")}>
+    <div className={classNames(sharedClassName, charClassName, "nsv:mr-px")}>
       {char}
     </div>
   );
@@ -654,7 +664,7 @@ export const CopyDisplay = ({
   className?: string;
 }) => {
   return (
-    <span className="flex items-center gap-2 px-1 py-px">
+    <span className="nsv:flex nsv:items-center nsv:gap-2 nsv:px-1 nsv:py-px">
       <Select
         value={seqIdxToCopy.toString()}
         onValueChange={(value) => setSeqIdxToCopy(parseInt(value))}
@@ -665,12 +675,12 @@ export const CopyDisplay = ({
               base: { base: "A", annotations: [], index: 0 },
               sequenceIdx: seqIdxToCopy,
             }),
-            "text-sequences-foreground w-fit rounded-none border-r",
+            "nsv:text-sequences-foreground nsv:w-fit nsv:rounded-none nsv:[border-right-width:1px]",
           )}
         >
           <SelectValue>Sequence {seqIdxToCopy + 1}</SelectValue>
         </SelectTrigger>
-        <SelectContent className="text-sequences-foreground bg-sequences-background">
+        <SelectContent className="nsv:text-sequences-foreground nsv:bg-sequences-background">
           {annotatedSequences.map((_, idx) => (
             <SelectItem
               key={`sequence-${idx}`}

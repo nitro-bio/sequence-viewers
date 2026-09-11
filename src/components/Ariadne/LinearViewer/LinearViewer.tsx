@@ -126,8 +126,8 @@ export const LinearViewer = (props: Props) => {
     }
     return classNames(
       userProvided,
-      sequenceIdx == 0 && "text-sequences-primary",
-      sequenceIdx > 0 && "text-sequences-secondary",
+      sequenceIdx == 0 && "nsv-linear-primary",
+      sequenceIdx > 0 && "nsv-linear-secondary",
     );
   };
 
@@ -141,11 +141,11 @@ export const LinearViewer = (props: Props) => {
   }
 
   return (
-    <div className={containerClassName || ""}>
+    <div className={classNames("nsv-root", containerClassName)}>
       <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
         ref={selectionRef}
-        className={classNames("font-thin select-none")}
+        className={classNames("nsv:[font-weight:100] nsv:select-none")}
         onDoubleClick={onDoubleClick}
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
         width="100%"
@@ -234,9 +234,9 @@ const SequenceLine = ({
     mismatchClassName ??
     function mismatchClassName(mismatch: AnnotatedBase) {
       if (mismatch.base === "-") {
-        return "fill-black stroke-black opacity-80";
+        return "nsv:fill-black nsv:stroke-black nsv:opacity-80";
       } else {
-        return "dark:fill-red-600 dark:stroke-red-600 fill-red-700 stroke-red-700";
+        return "nsv:dark:fill-red-600 nsv:dark:stroke-red-600 nsv:fill-red-700 nsv:stroke-red-700";
       }
     };
 
@@ -266,7 +266,9 @@ const SequenceLine = ({
         lastXPerc = xPerc;
         return (
           <g
-            className={classNames(mismatchClassName?.(base) || "bg-red-400")}
+            className={classNames(
+              mismatchClassName?.(base) || "nsv:bg-red-400",
+            )}
             key={`sequence-${sequenceIdx}-mismatch-${base.index}`}
           >
             <line
@@ -360,8 +362,8 @@ const LinearSelection = ({
   return (
     <g
       className={classNames(
-        "fill-current stroke-current",
-        "bg-sequences-selection fill-sequences-selection text-sequences-selection stroke-sequences-selection",
+        "nsv:fill-current nsv:stroke-current",
+        "nsv-linear-selection",
         selectionClassName?.(selection),
       )}
     >

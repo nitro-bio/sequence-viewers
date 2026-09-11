@@ -1,0 +1,3 @@
+/* Storybook is an application, so it opts in to Tailwind's document reset. */
+@import "tailwindcss";
+@import "../src/index.css";

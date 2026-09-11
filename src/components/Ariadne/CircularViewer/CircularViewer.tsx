@@ -102,10 +102,7 @@ export const CircularViewer = ({
 
   return (
     <div
-      className={classNames(
-        "text-sequences-primary flex items-center justify-center font-thin select-none",
-        containerClassName,
-      )}
+      className={classNames("nsv-root nsv-circular-root", containerClassName)}
     >
       <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
@@ -115,7 +112,7 @@ export const CircularViewer = ({
         fontFamily="inherit"
         fontSize="inherit"
         fontWeight="inherit"
-        className={`stroke-current`}
+        className="nsv:stroke-current"
         width={sizeX}
         height={sizeY}
       >

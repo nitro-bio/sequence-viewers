@@ -34,6 +34,7 @@ const makeClient = (exec: (command: string) => Promise<string>) => {
       mountedFasta = new TextDecoder().decode(buffer);
     }),
     exec: vi.fn(exec),
+    reinit: vi.fn(async (tool: string) => void tool),
     fs: {
       readdir: vi.fn(async () => [] as string[]),
       unlink: vi.fn(async (path: string) => void path),
@@ -219,6 +220,58 @@ describe("useMafftEinsi", () => {
       "/shared/data/nsv-mafft-einsi-1.fa",
       "/shared/data/pre",
     ]);
+  });
+
+  test("retries a module import failure before constructing a worker", async () => {
+    const client = makeClient(async (command) =>
+      command.startsWith("cat ")
+        ? outputForMountedFasta(client.getMountedFasta())
+        : "",
+    );
+    const AioliConstructor = vi.fn(function () {
+      return Promise.resolve(client);
+    }) as unknown as typeof Aioli;
+    mockedLoadAioli
+      .mockRejectedValueOnce(new Error("chunk unavailable"))
+      .mockResolvedValue(AioliConstructor);
+    const onAligned = vi.fn();
+    const { result } = renderHook(() =>
+      useMafftEinsi({ sequences: ["acg", "ag"], onAligned }),
+    );
+
+    await act(async () => result.current.run());
+    expect(result.current.state).toMatchObject({
+      status: "error",
+      recovery: "retry",
+    });
+    expect(AioliConstructor).not.toHaveBeenCalled();
+
+    await act(async () => result.current.run());
+    expect(mockedLoadAioli).toHaveBeenCalledTimes(2);
+    expect(AioliConstructor).toHaveBeenCalledOnce();
+    expect(onAligned).toHaveBeenCalledOnce();
+  });
+
+  test("retains a rejected initialization and never constructs a second worker", async () => {
+    const initializationError = new Error("base asset unavailable");
+    const AioliConstructor = vi.fn(function () {
+      return Promise.reject(initializationError);
+    }) as unknown as typeof Aioli;
+    mockedLoadAioli.mockResolvedValue(AioliConstructor);
+    const { result } = renderHook(() =>
+      useMafftEinsi({ sequences: ["acg", "ag"], onAligned: vi.fn() }),
+    );
+
+    await act(async () => result.current.run());
+    expect(result.current.state).toMatchObject({
+      status: "error",
+      recovery: "remount",
+      reason: "initialization",
+    });
+
+    await act(async () => result.current.run());
+    expect(mockedLoadAioli).toHaveBeenCalledOnce();
+    expect(AioliConstructor).toHaveBeenCalledOnce();
   });
 
   test("reports FASTA delimiters without loading alignment tools", async () => {

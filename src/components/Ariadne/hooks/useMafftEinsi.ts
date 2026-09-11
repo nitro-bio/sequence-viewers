@@ -11,6 +11,7 @@ export type AlignState =
       status: "error";
       error: unknown;
       recovery: "retry" | "change-input" | "remount";
+      reason: "operation" | "input" | "configuration" | "initialization";
     };
 
 export interface AlignmentConfig {
@@ -33,6 +34,7 @@ interface UseMafftEinsi {
 interface CachedClient {
   configKey: string;
   promise: Promise<AioliClient>;
+  construction: { started: boolean };
 }
 
 const DATA_DIRECTORY = "/shared/data";
@@ -167,6 +169,7 @@ export function useMafftEinsi({
   const operationRef = useRef(0);
   const lifecycleRevisionRef = useRef(0);
   const clientRef = useRef<CachedClient>();
+  const retryNeedsReinitRef = useRef(false);
   const sequencesRef = useRef([...sequences]);
   const onAlignedRef = useRef(onAligned);
   const configRef = useRef<AlignmentConfig>({ ...config });
@@ -237,6 +240,7 @@ export function useMafftEinsi({
           status: "error",
           error: INVALID_INPUT_ERROR,
           recovery: "change-input",
+          reason: "input",
         });
       }
       return;
@@ -252,6 +256,7 @@ export function useMafftEinsi({
           status: "error",
           error: CONFIGURATION_CHANGED_ERROR,
           recovery: "remount",
+          reason: "configuration",
         });
       }
       return;
@@ -269,9 +274,13 @@ export function useMafftEinsi({
     let alignedSequences: string[];
     let cli: AioliClient | undefined;
     let filesBefore = new Set<string>();
+    let failureRecovery: "retry" | "remount" = "retry";
+    let failureReason: "operation" | "initialization" = "operation";
     try {
       if (!clientRef.current) {
+        const construction = { started: false };
         const promise = loadAioli().then((AioliConstructor) => {
+          construction.started = true;
           const aioliConfig = {
             debug: operationConfig.debug ?? false,
             ...(operationConfig.urlCDN
@@ -280,14 +289,19 @@ export function useMafftEinsi({
           };
           return new AioliConstructor(MAFFT_TOOLS, aioliConfig);
         });
-        clientRef.current = { configKey, promise };
+        clientRef.current = { configKey, promise, construction };
       }
 
       const cachedClient = clientRef.current;
       try {
         cli = await cachedClient.promise;
       } catch (error) {
-        if (clientRef.current === cachedClient) clientRef.current = undefined;
+        if (cachedClient.construction.started) {
+          failureRecovery = "remount";
+          failureReason = "initialization";
+        } else if (clientRef.current === cachedClient) {
+          clientRef.current = undefined;
+        }
         throw error;
       }
 
@@ -295,6 +309,10 @@ export function useMafftEinsi({
         filesBefore = new Set(await cli.fs.readdir(DATA_DIRECTORY));
       } catch {
         filesBefore = new Set();
+      }
+      if (retryNeedsReinitRef.current) {
+        await cli.reinit("mafft");
+        retryNeedsReinitRef.current = false;
       }
       await cli.write({
         path: `${DATA_DIRECTORY}/${fileName}`,
@@ -316,11 +334,17 @@ export function useMafftEinsi({
       const output = await cli.exec("cat /shared/data/pre");
       alignedSequences = parseMafftOutput(output, recordIds, inputSequences);
     } catch (error) {
+      if (cli) retryNeedsReinitRef.current = true;
       if (mountedRef.current && operationRef.current === operation) {
         setState(
           lifecycleRevisionRef.current === lifecycleRevision &&
             enabledRef.current
-            ? { status: "error", error, recovery: "retry" }
+            ? {
+                status: "error",
+                error,
+                recovery: failureRecovery,
+                reason: failureReason,
+              }
             : { status: "idle" },
         );
       }

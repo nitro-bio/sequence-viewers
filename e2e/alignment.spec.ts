@@ -28,7 +28,7 @@ test("disabled alignment has no action, runtime shim, or asset request", async (
   expect(alignmentRequests).toEqual([]);
 });
 
-test("failed asset loading is announced and can be retried", async ({
+test("failed worker initialization requires a remount without another request", async ({
   page,
 }) => {
   const failedAssetRequests: string[] = [];
@@ -40,19 +40,58 @@ test("failed asset loading is announced and can be retried", async ({
 
   await page.goto("/?alignment=failure");
   await page.getByRole("button", { name: "Align" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Alignment worker could not initialize",
+    { timeout: 90_000 },
+  );
+  const firstAttemptRequests = failedAssetRequests.length;
+  expect(firstAttemptRequests).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Align" })).toBeDisabled();
+
+  await page
+    .getByRole("button", { name: "Align" })
+    .evaluate((button) => (button as HTMLButtonElement).click());
+  await page.waitForTimeout(500);
+  expect(failedAssetRequests).toHaveLength(firstAttemptRequests);
+});
+
+test("a transient MAFFT tool failure retries on the retained worker", async ({
+  page,
+}) => {
+  let tbfastRequests = 0;
+  await page.route("**/assets/mafft/7.520/tbfast.js", async (route) => {
+    tbfastRequests += 1;
+    if (tbfastRequests === 1) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.route("https://biowasm.com/**", async (route) => {
+    await route.abort();
+  });
+
+  await page.goto("/?alignment=self-hosted");
+  await page.getByRole("button", { name: "Align" }).click();
   await expect(page.getByRole("alert")).toContainText("Alignment failed", {
     timeout: 90_000,
   });
-  const firstAttemptRequests = failedAssetRequests.length;
-  expect(firstAttemptRequests).toBeGreaterThan(0);
+  expect(tbfastRequests).toBe(1);
 
   await page.getByRole("button", { name: "Retry alignment" }).click();
   await expect
-    .poll(() => failedAssetRequests.length, { timeout: 90_000 })
-    .toBeGreaterThan(firstAttemptRequests);
-  await expect(page.getByRole("alert")).toContainText("Alignment failed", {
-    timeout: 90_000,
-  });
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { alignmentUpdates: string[][] })
+              .alignmentUpdates.length,
+        ),
+      { timeout: 90_000 },
+    )
+    .toBe(1);
+  expect(tbfastRequests).toBe(2);
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("self-hosted assets run a real alignment with public CDN blocked", async ({

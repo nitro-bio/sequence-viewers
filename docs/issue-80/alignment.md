@@ -32,10 +32,10 @@ commands run. Later retries reuse that client.
 Aioli 3.2.1 accepts `urlCDN` and `debug` only while constructing its private
 worker. It exposes neither supported runtime configuration mutation nor a
 worker termination method. Changes to `alignmentConfig` made before the first
-Align action are used normally. After the worker initializes, the configuration
-is fixed for that mounted viewer. If it changes, alignment reports that the
-viewer must be remounted to apply the new configuration and does not create an
-additional worker.
+Align action are used normally. Once worker construction starts, the
+configuration is fixed for that mounted viewer. If it changes, alignment
+reports that the viewer must be remounted to apply the new configuration and
+does not create an additional worker.
 
 By default, Aioli loads executable assets from
 `https://biowasm.com/cdn/v3`. The exact pinned tools are:
@@ -128,12 +128,26 @@ change back before it finishes. Invalidated and unmounted operations do not call
 the latest committed callback receives the result once. Consumer callback
 exceptions are not presented as alignment failures.
 
-Failures render an accessible alert and turn the action into Retry alignment.
+Failures after Aioli returns its client render an accessible alert and turn the
+action into Retry alignment. Before retrying, the hook calls Aioli 3.2.1's
+implemented `reinit("mafft")` worker operation to restore the pinned MAFFT tools
+to their initial loading state; the same worker is retained. A failure while
+importing the lazy Aioli module occurs before worker construction and can also
+be retried safely.
+
+Aioli constructs its private worker before awaiting base-tool initialization.
+If that initialization rejects because assets are missing, blocked, or invalid,
+no client is returned and the worker cannot be terminated. The rejected promise
+therefore remains cached, alignment reports an asset-access error, and the
+viewer must be remounted to try again. Repeated actions cannot construct more
+workers.
+
 Sequences containing `>`, carriage returns, or line feeds cannot be embedded
 safely in the generated FASTA input. Selecting Align for such input reports an
 accessible error without loading Aioli; update the input sequences to continue.
 A committed input, configuration, or enablement change clears a settled success
 or failure message.
+
 The hook removes files created by each operation through Aioli's documented
 virtual filesystem API. Aioli 3.2.1 exposes no public worker termination method,
 so the client is retained and reused for the mounted viewer rather than calling

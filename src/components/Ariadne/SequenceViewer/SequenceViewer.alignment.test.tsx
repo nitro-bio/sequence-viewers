@@ -39,6 +39,7 @@ const makeClient = () => {
       );
       return `>${ids[0]}\nACG\n>${ids[1]}\nA-G\n`;
     }),
+    reinit: vi.fn(async (tool: string) => void tool),
     fs: {
       readdir: vi.fn(async () => [] as string[]),
       unlink: vi.fn(async (path: string) => void path),
@@ -143,7 +144,7 @@ test("an alignment failure is announced and can be retried", async () => {
     );
     return `>${ids[0]}\nACG\n>${ids[1]}\nA-G\n`;
   });
-  installClient(client);
+  const AioliConstructor = installClient(client);
   const setSequences = vi.fn();
   render(
     <SequenceViewer
@@ -163,6 +164,30 @@ test("an alignment failure is announced and can be retried", async () => {
     expect(setSequences).toHaveBeenCalledWith(["ACG", "A-G"]),
   );
   expect(setSequences).toHaveBeenCalledOnce();
+  expect(AioliConstructor).toHaveBeenCalledOnce();
+  expect(client.reinit).toHaveBeenCalledOnce();
+  expect(client.reinit).toHaveBeenCalledWith("mafft");
+});
+
+test("a worker initialization failure requires an accessible remount", async () => {
+  const AioliConstructor = vi.fn(function () {
+    return Promise.reject(new Error("base asset unavailable"));
+  }) as unknown as typeof Aioli;
+  mockedLoadAioli.mockResolvedValue(AioliConstructor);
+  render(
+    <SequenceViewer {...viewerProps} setSequences={vi.fn()} enableAlignment />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Align" }));
+
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Alignment worker could not initialize. Check alignment asset access, then remount SequenceViewer to try again.",
+  );
+  expect(
+    (screen.getByRole("button", { name: "Align" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  expect(AioliConstructor).toHaveBeenCalledOnce();
 });
 
 test("an initialized configuration change requires an accessible remount", async () => {

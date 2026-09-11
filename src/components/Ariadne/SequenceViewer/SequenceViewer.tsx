@@ -503,14 +503,21 @@ export const SeqMetadataBar = ({
 }) => {
   const alignmentExplanationId = useId();
   const alignmentError = alignState.status === "error" ? alignState : undefined;
-  const alignmentNeedsInputChange = alignmentError?.recovery === "change-input";
-  const alignmentNeedsRemount = alignmentError?.recovery === "remount";
+  const alignmentNeedsInputChange = alignmentError?.reason === "input";
+  const alignmentConfigurationChanged =
+    alignmentError?.reason === "configuration";
+  const alignmentInitializationFailed =
+    alignmentError?.reason === "initialization";
+  const alignmentNeedsRemount =
+    alignmentConfigurationChanged || alignmentInitializationFailed;
   const alignmentCannotRun = alignmentNeedsInputChange || alignmentNeedsRemount;
   const alignmentErrorMessage = alignmentNeedsInputChange
     ? "Alignment input cannot contain FASTA headers or line breaks. Update the sequences before aligning."
-    : alignmentNeedsRemount
+    : alignmentConfigurationChanged
       ? "Alignment configuration changed after initialization. Remount SequenceViewer to apply the new configuration."
-      : "Alignment failed. Select Retry alignment to try again.";
+      : alignmentInitializationFailed
+        ? "Alignment worker could not initialize. Check alignment asset access, then remount SequenceViewer to try again."
+        : "Alignment failed. Select Retry alignment to try again.";
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(

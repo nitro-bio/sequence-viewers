@@ -36,6 +36,7 @@ declare module "@biowasm/aioli" {
     mount(options: MountOptions | MountOptions[]): Promise<string[]>;
     write(options: WriteOptions): Promise<void>;
     exec(command: string): Promise<string>;
+    reinit(tool: string): Promise<void>;
     fs: FileSystem;
   }
 

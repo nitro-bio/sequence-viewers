@@ -59,6 +59,10 @@ test("a transient MAFFT tool failure retries on the retained worker", async ({
   page,
 }) => {
   let tbfastRequests = 0;
+  let workerCount = 0;
+  page.on("worker", () => {
+    workerCount += 1;
+  });
   await page.route("**/assets/mafft/7.520/tbfast.js", async (route) => {
     tbfastRequests += 1;
     if (tbfastRequests === 1) {
@@ -90,7 +94,10 @@ test("a transient MAFFT tool failure retries on the retained worker", async ({
       { timeout: 90_000 },
     )
     .toBe(1);
-  expect(tbfastRequests).toBe(2);
+  // Aioli requests the loader once for the failed lazy setup, once during the
+  // explicit retry reinit, and once during tbfast's configured post-run reinit.
+  expect(tbfastRequests).toBe(3);
+  expect(workerCount).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 

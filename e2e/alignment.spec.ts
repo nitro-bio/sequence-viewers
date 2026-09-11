@@ -1,216 +1,102 @@
 import { expect, test } from "@playwright/test";
 
-const selfHostedInput = ["ACGTACGTACGT", "ACGTTCGTACG"];
-
-const isAlignmentAsset = (url: string) => {
-  const parsed = new URL(url);
-  return (
-    parsed.hostname === "biowasm.com" ||
-    parsed.pathname.startsWith("/assets/coreutils/") ||
-    parsed.pathname.startsWith("/assets/mafft/")
-  );
-};
-
-test("disabled alignment has no action, runtime shim, or asset request", async ({
+test("opt in to self-hosted MAFFT, recover from failure, and discard obsolete results", async ({
   page,
 }) => {
-  const alignmentRequests: string[] = [];
-  page.on("request", (request) => {
-    if (isAlignmentAsset(request.url())) {
-      alignmentRequests.push(request.url());
-    }
-  });
-
-  await page.goto("/?alignment=disabled");
-  await expect(page.getByRole("button", { name: "Align" })).toHaveCount(0);
-  expect(await page.evaluate(() => "process" in window)).toBe(false);
-  await page.waitForTimeout(250);
-  expect(alignmentRequests).toEqual([]);
-});
-
-test("failed worker initialization requires a remount without another request", async ({
-  page,
-}) => {
-  const failedAssetRequests: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("/missing-assets/")) {
-      failedAssetRequests.push(request.url());
-    }
-  });
-
-  await page.goto("/?alignment=failure");
-  await page.getByRole("button", { name: "Align" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Alignment worker could not initialize",
-    { timeout: 90_000 },
-  );
-  const firstAttemptRequests = failedAssetRequests.length;
-  expect(firstAttemptRequests).toBeGreaterThan(0);
-  await expect(page.getByRole("button", { name: "Align" })).toBeDisabled();
-
-  await page
-    .getByRole("button", { name: "Align" })
-    .evaluate((button) => (button as HTMLButtonElement).click());
-  await page.waitForTimeout(500);
-  expect(failedAssetRequests).toHaveLength(firstAttemptRequests);
-});
-
-test("a transient MAFFT tool failure retries on the retained worker", async ({
-  page,
-}) => {
-  let tbfastRequests = 0;
   let workerCount = 0;
-  page.on("worker", () => {
-    workerCount += 1;
+  let toolRequests = 0;
+  let holdNextLoad = false;
+  let releaseLoad = () => {};
+  let loadStarted = () => {};
+  const publicRequests: string[] = [];
+  page.on("worker", () => workerCount++);
+  await page.route("https://biowasm.com/**", async (route) => {
+    publicRequests.push(route.request().url());
+    await route.abort();
   });
   await page.route("**/assets/mafft/7.520/tbfast.js", async (route) => {
-    tbfastRequests += 1;
-    if (tbfastRequests === 1) {
-      await route.abort("failed");
-      return;
+    if (++toolRequests === 1) return route.abort("failed");
+    if (holdNextLoad) {
+      holdNextLoad = false;
+      await new Promise<void>((resolve) => {
+        releaseLoad = resolve;
+        loadStarted();
+      });
     }
     await route.continue();
   });
-  await page.route("https://biowasm.com/**", async (route) => {
-    await route.abort();
-  });
-
-  await page.goto("/?alignment=self-hosted");
-  await page.getByRole("button", { name: "Align" }).click();
-  await expect(page.getByRole("alert")).toContainText("Alignment failed", {
-    timeout: 90_000,
-  });
-  expect(tbfastRequests).toBe(1);
-
-  await page.getByRole("button", { name: "Retry alignment" }).click();
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (window as unknown as { alignmentUpdates: string[][] })
-              .alignmentUpdates.length,
-        ),
-      { timeout: 90_000 },
-    )
-    .toBe(1);
-  // Aioli requests the loader once for the failed lazy setup, once during the
-  // explicit retry reinit, and once during tbfast's configured post-run reinit.
-  expect(tbfastRequests).toBe(3);
-  expect(workerCount).toBe(1);
-  await expect(page.getByRole("alert")).toHaveCount(0);
-});
-
-test("self-hosted assets run a real alignment with public CDN blocked", async ({
-  page,
-}) => {
-  const publicCdnRequests: string[] = [];
-  const selfHostedRequests = new Set<string>();
-  await page.route("https://biowasm.com/**", async (route) => {
-    publicCdnRequests.push(route.request().url());
-    await route.abort();
-  });
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (
-      url.pathname.startsWith("/assets/coreutils/") ||
-      url.pathname.startsWith("/assets/mafft/")
-    ) {
-      selfHostedRequests.add(url.pathname);
-    }
-  });
-
-  await page.goto("/?alignment=self-hosted");
-  expect(await page.evaluate(() => "process" in window)).toBe(false);
-  await page.getByRole("button", { name: "Align" }).click();
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (window as unknown as { alignmentUpdates: string[][] })
-              .alignmentUpdates.length,
-        ),
-      { timeout: 90_000 },
-    )
-    .toBe(1);
-
-  const [aligned] = await page.evaluate(
-    () =>
-      (window as unknown as { alignmentUpdates: string[][] }).alignmentUpdates,
-  );
-  expect(aligned).toHaveLength(selfHostedInput.length);
-  expect(new Set(aligned.map((sequence) => sequence.length)).size).toBe(1);
-  aligned.forEach((sequence, index) => {
-    expect(sequence.replaceAll("-", "")).toBe(selfHostedInput[index]);
-  });
-  await page.waitForTimeout(500);
-  expect(
-    await page.evaluate(
-      () =>
-        (window as unknown as { alignmentUpdates: string[][] }).alignmentUpdates
-          .length,
-    ),
-  ).toBe(1);
-  expect(publicCdnRequests).toEqual([]);
-  expect([...selfHostedRequests].sort()).toEqual(
-    [
-      "/assets/coreutils/8.32/cat.js",
-      "/assets/coreutils/8.32/cat.wasm",
-      "/assets/mafft/7.520/dvtditr.js",
-      "/assets/mafft/7.520/dvtditr.wasm",
-      "/assets/mafft/7.520/tbfast.js",
-      "/assets/mafft/7.520/tbfast.wasm",
-    ].sort(),
-  );
-});
-
-test("self-hosted alignment runs under a restrictive CSP", async ({ page }) => {
-  const csp = [
-    "default-src 'none'",
-    "script-src 'self' 'wasm-unsafe-eval'",
-    "worker-src blob:",
-    "connect-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
-    "font-src 'self'",
-    "base-uri 'none'",
-    "object-src 'none'",
-  ].join("; ");
-  const publicCdnRequests: string[] = [];
-
-  await page.route("**/*", async (route) => {
-    if (!route.request().isNavigationRequest()) {
-      await route.continue();
-      return;
-    }
+  await page.route("http://127.0.0.1:4173/", async (route) => {
     const response = await route.fetch();
     await route.fulfill({
       response,
       headers: {
         ...response.headers(),
-        "content-security-policy": csp,
+        "content-security-policy":
+          "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; object-src 'none'",
       },
     });
   });
-  await page.route("https://biowasm.com/**", async (route) => {
-    publicCdnRequests.push(route.request().url());
-    await route.abort();
-  });
+  await page.goto("/");
+  await page.addStyleTag({ url: "/library.css" });
+  expect(await page.evaluate(() => "process" in window)).toBe(false);
+  await expect(
+    page.getByRole("button", { name: "Align", exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("Enable alignment").check();
+  const align = page.getByRole("button", { name: "Align", exact: true });
+  await expect(align).toBeEnabled();
+  expect(workerCount).toBe(0);
+  expect(toolRequests).toBe(0);
 
-  await page.goto("/?alignment=self-hosted");
-  await page.getByRole("button", { name: "Align" }).click();
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (window as unknown as { alignmentUpdates: string[][] })
-              .alignmentUpdates.length,
-        ),
-      { timeout: 90_000 },
-    )
-    .toBe(1);
+  await align.click();
+  await expect(page.getByRole("alert")).toContainText("Alignment failed", {
+    timeout: 90_000,
+  });
+  await page.getByRole("button", { name: "Retry alignment" }).click();
+  await expect(page.getByTestId("alignment-updates")).toHaveText("1", {
+    timeout: 90_000,
+  });
+  const aligned: string[] = JSON.parse(
+    (await page.getByTestId("sequence-output").textContent())!,
+  );
+  expect(new Set(aligned.map((sequence) => sequence.length)).size).toBe(1);
+  expect(aligned.map((sequence) => sequence.replaceAll("-", ""))).toEqual([
+    "ACGTACGTACGT",
+    "ACGTTCGTACG",
+  ]);
   await expect(page.getByRole("alert")).toHaveCount(0);
-  expect(publicCdnRequests).toEqual([]);
+
+  // Pause a real tool load so a host edit deterministically overtakes alignment.
+  holdNextLoad = true;
+  const loading = new Promise<void>((resolve) => {
+    loadStarted = resolve;
+  });
+  await align.click();
+  await loading;
+  try {
+    await page.getByLabel("Sequences", { exact: true }).fill('["ACGT","AGT"]');
+    await page.getByRole("button", { name: "Apply sequences" }).click();
+  } finally {
+    releaseLoad();
+  }
+  await expect(align).toBeEnabled({ timeout: 90_000 });
+  await expect(page.getByTestId("alignment-updates")).toHaveText("1");
+  await expect(page.getByTestId("sequence-output")).toHaveText(
+    '["ACGT","AGT"]',
+  );
+
+  await align.click();
+  await expect(page.getByTestId("alignment-updates")).toHaveText("2", {
+    timeout: 90_000,
+  });
+  const updated: string[] = JSON.parse(
+    (await page.getByTestId("sequence-output").textContent())!,
+  );
+  expect(new Set(updated.map((sequence) => sequence.length)).size).toBe(1);
+  expect(updated.map((sequence) => sequence.replaceAll("-", ""))).toEqual([
+    "ACGT",
+    "AGT",
+  ]);
+  expect(workerCount).toBe(1);
+  expect(publicRequests).toEqual([]);
 });

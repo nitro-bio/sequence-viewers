@@ -109,12 +109,14 @@ export const LinearViewer = (props: Props) => {
     (annotatedSequence) => annotatedSequence.length > 0,
   );
   const displayedSelection =
-    maxSequenceLength === 0
+    maxSequenceLength === 0 ||
+    (selection && Math.min(selection.start, selection.end) >= maxSequenceLength)
       ? null
       : clampSlice({
           slice: selection,
           firstIdx: 0,
-          lastIdx: maxSequenceLength - 1,
+          // Linear selections use boundaries: length is a valid end position.
+          lastIdx: maxSequenceLength,
         });
   const selectionRef = useRef<SVGSVGElement>(null);
 

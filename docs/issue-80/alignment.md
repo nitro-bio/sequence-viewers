@@ -129,9 +129,10 @@ the latest committed callback receives the result once. Consumer callback
 exceptions are not presented as alignment failures.
 
 Failures after Aioli returns its client render an accessible alert and turn the
-action into Retry alignment. Before retrying, the hook calls Aioli 3.2.1's
-implemented `reinit("mafft")` worker operation to restore the pinned MAFFT tools
-to their initial loading state; the same worker is retained. A failure while
+action into Retry alignment. Both MAFFT programs reset after successful execution. They use distinct internal
+tool identifiers because Aioli's `reinit(tool)` resets only the first matching
+program. A retry explicitly resets both programs through that operation; the same
+worker is retained. Both identifiers still load assets from `mafft/7.520`. A failure while
 importing the lazy Aioli module occurs before worker construction and can also
 be retried safely.
 

@@ -1,4 +1,4 @@
-import { useState, version } from "react";
+import { Component, useState, version, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CircularViewer,
@@ -11,66 +11,99 @@ import {
   type AriadneSelection,
 } from "@nitro-bio/sequence-viewers";
 
-const params = new URLSearchParams(location.search);
-const framework = params.get("framework") || "plain";
-const alignment = params.get("alignment") || "disabled";
+const framework =
+  new URLSearchParams(location.search).get("framework") || "plain";
 const hostLink = document.createElement("link");
 hostLink.rel = "stylesheet";
 hostLink.href = `/host-${framework}.css`;
 document.head.append(hostLink);
+document.documentElement.dataset.react = version;
 
-Object.assign(window, {
-  reactVersion: version,
-  alignmentUpdates: [] as string[][],
-  loadLibraryStyles: (order: "before" | "after") =>
-    new Promise<void>((resolve, reject) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "/library.css";
-      link.onload = () => resolve();
-      link.onerror = reject;
-      if (order === "before") hostLink.before(link);
-      else hostLink.after(link);
-    }),
-});
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <p role="alert">Viewer error boundary</p>
+    ) : (
+      this.props.children
+    );
+  }
+}
 
-const annotations: Annotation[] = [
-  {
-    start: 1,
-    end: 6,
-    direction: "forward",
-    type: "CDS",
-    text: "Example feature",
-    className: "caller-annotation",
-  },
-];
+const feature: Annotation = {
+  start: 1,
+  end: 6,
+  direction: "forward",
+  type: "CDS",
+  text: "Example feature",
+  className: "caller-annotation",
+};
 
 export function App() {
   const [sequences, updateSequences] = useState([
     "ACGTACGTACGT",
-    alignment === "self-hosted" ? "ACGTTCGTACG" : "ACGTTCGTACGT",
+    "ACGTTCGTACG",
   ]);
+  const [draft, setDraft] = useState(JSON.stringify(sequences));
   const [selection, setSelection] = useState<AriadneSelection | null>({
     start: 1,
     end: 3,
     direction: "forward",
   });
-  const setSequences = (next: string[]) => {
-    (
-      window as unknown as { alignmentUpdates: string[][] }
-    ).alignmentUpdates.push(next);
-    updateSequences(next);
+  const [enableAlignment, setEnableAlignment] = useState(false);
+  const [invalidAnnotations, setInvalidAnnotations] = useState(false);
+  const [strict, setStrict] = useState(false);
+  const [alignmentUpdates, setAlignmentUpdates] = useState(0);
+  const annotations = invalidAnnotations
+    ? [feature, { ...feature, start: Number.NaN, text: "Invalid feature" }]
+    : [feature];
+  const shared = {
+    annotations,
+    selection,
+    setSelection,
+    validationMode: strict ? ("strict" as const) : ("recover" as const),
   };
-  const alignmentProps = {
-    enableAlignment: alignment !== "disabled",
-    alignmentConfig: {
-      urlCDN: new URL(
-        alignment === "failure" ? "/missing-assets" : "/assets",
-        location.origin,
-      ).href,
-      debug: false,
-    },
+  const viewers = {
+    sequence: (
+      <SequenceViewer
+        {...shared}
+        sequences={sequences}
+        setSequences={(next) => {
+          updateSequences(next);
+          setAlignmentUpdates((count) => count + 1);
+        }}
+        enableAlignment={enableAlignment}
+        alignmentConfig={{ urlCDN: new URL("/assets", location.origin).href }}
+        containerClassName="caller-container"
+        charClassName={() => "caller-char"}
+        selectionClassName="caller-selection"
+      />
+    ),
+    linear: (
+      <LinearViewer
+        {...shared}
+        sequences={sequences}
+        containerClassName="caller-linear"
+      />
+    ),
+    circular: (
+      <CircularViewer
+        {...shared}
+        sequence={sequences[0] ?? ""}
+        containerClassName="caller-circular"
+      />
+    ),
   };
+  const annotatedSequence = getAnnotatedSequence({
+    sequence: sequences[0] ?? "",
+    stackedAnnotations: [],
+  });
   return (
     <main>
       <section id="host">
@@ -88,77 +121,75 @@ export function App() {
           Host utilities
         </div>
       </section>
-      <section data-testid="sequence-viewer">
-        <SequenceViewer
-          sequences={sequences}
-          setSequences={setSequences}
-          annotations={annotations}
-          selection={selection}
-          setSelection={setSelection}
-          containerClassName="caller-container"
-          charClassName={() => "caller-char"}
-          selectionClassName="caller-selection"
-          {...alignmentProps}
+      <section aria-label="Viewer controls">
+        <textarea
+          aria-label="Sequences"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
         />
+        <button onClick={() => updateSequences(JSON.parse(draft))}>
+          Apply sequences
+        </button>
+        <button
+          onClick={() =>
+            setSelection({
+              start: 0,
+              end: Math.max(0, ...sequences.map((sequence) => sequence.length)),
+              direction: "forward",
+            })
+          }
+        >
+          Select all
+        </button>
+        <button onClick={() => updateSequences([])}>Clear sequences</button>
+        <label>
+          <input
+            type="checkbox"
+            checked={enableAlignment}
+            onChange={(event) => setEnableAlignment(event.target.checked)}
+          />
+          Enable alignment
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={invalidAnnotations}
+            onChange={(event) => setInvalidAnnotations(event.target.checked)}
+          />
+          Invalid annotations
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={strict}
+            onChange={(event) => setStrict(event.target.checked)}
+          />
+          Strict validation
+        </label>
       </section>
-      <section data-testid="linear-viewer">
-        <LinearViewer
-          sequences={sequences}
-          annotations={annotations}
-          selection={selection}
-          setSelection={setSelection}
-          containerClassName="caller-linear"
-        />
-      </section>
-      <section data-testid="circular-viewer">
-        <CircularViewer
-          sequence={sequences[0]}
-          annotations={annotations}
-          selection={selection}
-          setSelection={setSelection}
-          containerClassName="caller-circular"
-        />
-      </section>
-      <section data-testid="recoverable-diagnostic">
-        <SequenceViewer
-          sequences={["ACGT"]}
-          annotations={[{ ...annotations[0], start: Number.NaN }]}
-          selection={null}
-          setSelection={setSelection}
-          charClassName={() => ""}
-          hideMetadataBar
-          containerClassName="caller-container"
-        />
-      </section>
-      <section data-testid="circular-diagnostic">
-        <CircularViewer
-          sequence="ACGT"
-          annotations={[{ ...annotations[0], start: Number.NaN }]}
-          selection={null}
-          setSelection={setSelection}
-        />
-      </section>
+      {Object.entries(viewers).map(([name, viewer]) => (
+        <section key={name} data-testid={`${name}-viewer`}>
+          <ErrorBoundary key={`${strict}-${invalidAnnotations}`}>
+            {viewer}
+          </ErrorBoundary>
+        </section>
+      ))}
       <section data-testid="standalone-ticks">
-        <ReferenceTicks
-          sequence={getAnnotatedSequence({
-            sequence: sequences[0],
-            stackedAnnotations: [],
-          })}
-        />
+        <ReferenceTicks sequence={annotatedSequence} />
       </section>
-      <section data-testid="standalone-gutter">
-        <LinearAnnotationGutter
-          sequence={getAnnotatedSequence({
-            sequence: sequences[0],
-            stackedAnnotations: [],
-          })}
-          stackedAnnotations={annotations.map((annotation) => ({
-            ...annotation,
-            stack: 0,
-          }))}
-        />
-      </section>
+      {annotatedSequence.length > 0 && (
+        <section data-testid="standalone-gutter">
+          <LinearAnnotationGutter
+            sequence={annotatedSequence}
+            stackedAnnotations={[{ ...feature, stack: 0 }]}
+          />
+        </section>
+      )}
       <output data-testid="sequence-output">{JSON.stringify(sequences)}</output>
+      <output data-testid="selection-output">
+        {JSON.stringify(selection)}
+      </output>
+      <output data-testid="alignment-updates">{alignmentUpdates}</output>
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
@@ -11,8 +12,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
+    cwd: resolve(__dirname, ".."),
     command: "node e2e/serve-packed.mjs",
     url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 });

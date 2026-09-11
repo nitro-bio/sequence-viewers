@@ -49,6 +49,7 @@ interface CachedClient {
 const DATA_DIRECTORY = "/shared/data";
 const MAFFT_VERSION = "7.520";
 const COREUTILS_VERSION = "8.32";
+const REFINEMENT_TOOL = "mafft-refine";
 
 const MAFFT_TOOLS = [
   {
@@ -65,11 +66,13 @@ const MAFFT_TOOLS = [
     reinit: true,
   },
   {
-    tool: "mafft",
+    // Aioli reinit(tool) selects the first matching tool, so each program
+    // needs its own identifier to reset its WASM runtime between alignments.
+    tool: REFINEMENT_TOOL,
     version: MAFFT_VERSION,
     program: "dvtditr",
     loading: "lazy",
-    reinit: false,
+    reinit: true,
   },
 ] as const;
 
@@ -307,7 +310,15 @@ export function useMafftEinsi({
               ? { urlCDN: operationConfig.urlCDN }
               : {}),
           };
-          return new AioliConstructor(MAFFT_TOOLS, aioliConfig);
+          const tools = MAFFT_TOOLS.map((tool) =>
+            tool.tool === REFINEMENT_TOOL
+              ? {
+                  ...tool,
+                  urlPrefix: `${(operationConfig.urlCDN || "https://biowasm.com/cdn/v3").replace(/\/$/, "")}/mafft/${MAFFT_VERSION}`,
+                }
+              : tool,
+          );
+          return new AioliConstructor(tools, aioliConfig);
         });
         clientRef.current = { configKey, promise, construction };
       }
@@ -332,6 +343,7 @@ export function useMafftEinsi({
       }
       if (retryNeedsReinitRef.current) {
         await cli.reinit("mafft");
+        await cli.reinit(REFINEMENT_TOOL);
         retryNeedsReinitRef.current = false;
       }
       await cli.write({

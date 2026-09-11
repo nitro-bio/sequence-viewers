@@ -1,0 +1,39 @@
+:root {
+  --color-emerald-700: rgb(111, 22, 33);
+  --color-zinc-800: rgb(23, 34, 45);
+  --font-mono: "Courier New";
+  --spacing: 9px;
+}
+body {
+  background: #fff;
+  color: #17212b;
+}
+main {
+  max-width: 920px;
+  margin: 24px auto;
+}
+section {
+  margin-bottom: 24px;
+}
+#host {
+  padding: 15px;
+  border: 2px solid #87929d;
+}
+[data-testid="host-theme"] {
+  color: var(--color-emerald-700);
+  font-family: var(--font-mono);
+  padding: var(--spacing);
+}
+.caller-char {
+  color: #0f766e;
+}
+.caller-annotation {
+  background: #fbbf24;
+  fill: #fbbf24;
+}
+.caller-selection {
+  outline: 1px solid #0f766e;
+}
+.caller-container {
+  border: 1px solid #cbd5e1;
+}

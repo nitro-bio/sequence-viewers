@@ -110,10 +110,16 @@ from npm does **not** eliminate runtime tool-asset downloads.
 For self-hosting, set `alignmentConfig={{ urlCDN: "https://your-host.example/assets" }}`
 and serve the complete documented asset directory. See the
 [alignment migration and self-hosting guide](docs/issue-80/alignment.md) for the
-exact files, browser/CSP/CORS requirements, error/retry behavior, and the distinction
-between mocked tests and real browser evidence.
+exact files, browser/CSP/CORS requirements, and error/retry behavior.
 
 ## Development
+
+Most regression coverage lives in four packed-package browser workflows: host CSS
+integration (plain CSS, Tailwind 3 and 4, both load orders), editing/selection/copy
+on React 19, validation recovery, and real self-hosted MAFFT under CSP with retry
+and stale-result handling. Run `pnpm build:ci && pnpm test:packed`; install Chromium
+once with `pnpm exec playwright install chromium`. Unit tests retain the existing
+parser checks and one focused streaming-memoization regression.
 
 ### Scripts
 

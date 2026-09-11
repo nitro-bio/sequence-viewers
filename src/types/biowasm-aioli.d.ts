@@ -1,32 +1,42 @@
 declare module "@biowasm/aioli" {
-  interface MountOptions {
+  export interface MountOptions {
     name: string;
     data: string;
   }
 
-  interface ToolConfig {
+  export interface ToolConfig {
     tool: string;
     version: string;
-    program: string;
-    reinit: boolean;
+    program?: string;
+    loading?: "eager" | "lazy";
+    reinit?: boolean;
+    urlPrefix?: string;
   }
 
-  interface AioliOptions {
+  export interface AioliOptions {
+    urlCDN?: string;
     debug?: boolean;
   }
 
-  interface FileSystem {
+  export interface FileSystem {
     unlink(path: string): Promise<void>;
     readdir(path: string): Promise<string[]>;
     stat(path: string): Promise<unknown>;
   }
 
-  class Aioli {
-    constructor(tools: (string | ToolConfig)[], options?: AioliOptions);
-    mount(options: MountOptions): Promise<void>;
+  export interface Aioli {
+    mount(options: MountOptions | MountOptions[]): Promise<string[]>;
     exec(command: string): Promise<string>;
     fs: FileSystem;
   }
 
-  export = Aioli;
+  export interface AioliConstructor {
+    new (
+      tools: readonly (string | ToolConfig)[],
+      options?: AioliOptions,
+    ): Promise<Aioli>;
+  }
+
+  const Aioli: AioliConstructor;
+  export default Aioli;
 }

@@ -64,6 +64,7 @@ MQDRVKRPMNAFIVWSRDQRRKMALENPRMRNSEISKQLGYQWKMLTEAEKWPFFQEAQKLQAMHREKYPNYKYRPRRKA
       <SequenceViewer
         sequences={sequences}
         setSequences={setSequences}
+        enableAlignment
         annotations={[]}
         selection={selection}
         setSelection={setSelection}
@@ -171,6 +172,7 @@ MQDRVKRPMNAFIVWSRDQRRKMALENPRMRNSEISKQLGYQWKMLTEAEKWPFFQEAQKLQAMHREKYPNYKYRPRRKA
       <SequenceViewer
         sequences={sequences}
         setSequences={setSequences}
+        enableAlignment
         annotations={annotations}
         selection={selection}
         setSelection={setSelection}

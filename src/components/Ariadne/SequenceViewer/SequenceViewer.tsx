@@ -5,9 +5,13 @@ import {
   stackAnnotationsNoOverlap,
 } from "@Ariadne/utils";
 import { classNames } from "@utils/stringUtils";
-import { useMafftEinsi } from "../hooks/useMafftEinsi";
+import {
+  useMafftEinsi,
+  type AlignmentConfig,
+  type AlignState,
+} from "../hooks/useMafftEinsi";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   AnnotatedBase,
   Annotation,
@@ -47,6 +51,8 @@ export const SequenceViewer = ({
   noValidate,
   validationMode,
   highlightMisalignments,
+  enableAlignment = false,
+  alignmentConfig,
 }: {
   sequences: string[];
   setSequences?: (sequences: string[]) => void;
@@ -68,13 +74,14 @@ export const SequenceViewer = ({
   noValidate?: boolean;
   validationMode?: ValidationMode;
   highlightMisalignments?: boolean;
+  enableAlignment?: boolean;
+  alignmentConfig?: AlignmentConfig;
 }) => {
   const [hoveredPosition, setHoveredPosition] = useState<number | null>(null);
   const [seqIdxToCopy, setSeqIdxToCopy] = useState<number>(0);
   const [activeAnnotation, setActiveAnnotation] = useState<Annotation | null>(
     null,
   );
-  const { state: alignState, run: runAlignment } = useMafftEinsi();
   const annotationsInput = normalizeAnnotationsInput(annotations);
   const validation = useMemo(
     () =>
@@ -87,6 +94,16 @@ export const SequenceViewer = ({
   );
   const validatedSequences = validation.sequences;
   const validatedAnnotations = validation.annotations;
+  const { state: alignState, run: runAlignment } = useMafftEinsi({
+    sequences: validatedSequences,
+    onAligned: setSequences,
+    config: alignmentConfig,
+    enabled: enableAlignment && !validation.hasUnsafeSequenceData,
+  });
+  const hasAlignmentInput =
+    validatedSequences.length > 0 &&
+    validatedSequences.every((sequence) => sequence.length > 0);
+
   const stackedAnnotations = useMemo(
     function memoize() {
       if (validation.hasUnsafeSequenceData) {
@@ -183,16 +200,11 @@ export const SequenceViewer = ({
             setSeqIdxToCopy={setSeqIdxToCopy}
             selection={selection}
             hideDownloadButton={hideDownloadButton}
-            onAlign={async () => {
-              if (!setSequences) return;
-              const fasta = validatedSequences
-                .map((seq, idx) => `>Sequence_${idx + 1}\n${seq}`)
-                .join("\n");
-
-              await runAlignment(fasta);
-            }}
+            alignmentEnabled={enableAlignment}
+            alignmentHasInput={hasAlignmentInput}
+            alignmentCanUpdate={Boolean(setSequences)}
+            onAlign={runAlignment}
             alignState={alignState}
-            setSequences={setSequences}
           />
         )}
         <div className="nsv:flex nsv:flex-wrap nsv:px-2">
@@ -398,9 +410,11 @@ export const SeqMetadataBar = ({
   selection,
   className,
   hideDownloadButton,
+  alignmentEnabled,
+  alignmentHasInput,
+  alignmentCanUpdate,
   onAlign,
   alignState,
-  setSequences,
 }: {
   hoveredPosition: number | null;
   activeAnnotation: Annotation | null;
@@ -417,40 +431,13 @@ export const SeqMetadataBar = ({
   }) => string;
   className?: string;
   hideDownloadButton?: boolean;
+  alignmentEnabled: boolean;
+  alignmentHasInput: boolean;
+  alignmentCanUpdate: boolean;
   onAlign: () => Promise<void>;
-  alignState?: {
-    status: "idle" | "running" | "done" | "error";
-    output?: string;
-    error?: unknown;
-  };
-  setSequences?: (sequences: string[]) => void;
+  alignState: AlignState;
 }) => {
-  useEffect(() => {
-    if (alignState?.status === "done" && alignState.output && setSequences) {
-      // Parse the aligned FASTA output
-      const lines = alignState.output.split("\n");
-      const alignedSequences: string[] = [];
-      let currentSeq = "";
-
-      for (const line of lines) {
-        if (line.startsWith(">")) {
-          if (currentSeq) {
-            alignedSequences.push(currentSeq);
-            currentSeq = "";
-          }
-        } else {
-          currentSeq += line.trim();
-        }
-      }
-      if (currentSeq) {
-        alignedSequences.push(currentSeq);
-      }
-
-      if (alignedSequences.length > 0) {
-        setSequences(alignedSequences.map((x) => x.toUpperCase()));
-      }
-    }
-  }, [alignState, setSequences]);
+  const alignmentExplanationId = useId();
   const annotationDisplay = activeAnnotation ? (
     <span
       className={classNames(
@@ -507,23 +494,49 @@ export const SeqMetadataBar = ({
         </Button>
       )}
 
-      {setSequences && (
-        <Button
-          onClick={onAlign}
-          size="xs"
-          disabled={alignState?.status === "running"}
-          className={classNames(
-            "nsv:bg-sequences-foreground/10 nsv:hover:bg-sequences-foreground/30 nsv:text-sequences-foreground",
-            "nsv:disabled:cursor-not-allowed nsv:disabled:opacity-50",
-            "nsv:[transition:color_150ms_ease,background-color_150ms_ease,border-color_150ms_ease,fill_150ms_ease,stroke_150ms_ease]",
+      {alignmentEnabled && alignmentHasInput && (
+        <>
+          <Button
+            onClick={() => void onAlign()}
+            size="xs"
+            disabled={!alignmentCanUpdate || alignState.status === "running"}
+            aria-describedby={
+              alignmentCanUpdate ? undefined : alignmentExplanationId
+            }
+            title={
+              alignmentCanUpdate
+                ? undefined
+                : "Alignment needs setSequences to apply its result."
+            }
+            className={classNames(
+              "nsv:bg-sequences-foreground/10 nsv:hover:bg-sequences-foreground/30 nsv:text-sequences-foreground",
+              "nsv:disabled:cursor-not-allowed nsv:disabled:opacity-50",
+              "nsv:[transition:color_150ms_ease,background-color_150ms_ease,border-color_150ms_ease,fill_150ms_ease,stroke_150ms_ease]",
+            )}
+          >
+            {alignState.status === "error" ? "Retry alignment" : "Align"}
+          </Button>
+          {!alignmentCanUpdate && (
+            <span
+              id={alignmentExplanationId}
+              className="nsv:text-sequences-foreground nsv:text-[0.75rem]/[1rem]"
+            >
+              Provide setSequences to apply an alignment.
+            </span>
           )}
-        >
-          Align
-        </Button>
+        </>
       )}
-      {alignState?.status === "error" && (
-        <span className="nsv:ml-2 nsv:text-[0.75rem]/[1rem] nsv:text-red-500">
-          Alignment failed
+      {alignmentEnabled && alignState.status === "running" && (
+        <span role="status" className="nsv:text-[0.75rem]/[1rem]">
+          Aligning sequences…
+        </span>
+      )}
+      {alignmentEnabled && alignState.status === "error" && (
+        <span
+          role="alert"
+          className="nsv:ml-2 nsv:text-[0.75rem]/[1rem] nsv:text-red-500"
+        >
+          Alignment failed. Select Retry alignment to try again.
         </span>
       )}
       <CopyDisplay

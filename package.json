@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "changeset": "changeset",
     "test:packed:prepare": "node e2e/packed-package.mjs",
-    "test:packed": "pnpm test:packed:prepare && playwright test --config e2e/playwright.config.ts"
+    "test:packed": "pnpm test:alignment:assets && pnpm test:packed:prepare && playwright test --config e2e/playwright.config.ts",
+    "test:alignment:assets": "node e2e/prepare-alignment-assets.mjs"
   },
   "dependencies": {
     "@biowasm/aioli": "^3.2.1",

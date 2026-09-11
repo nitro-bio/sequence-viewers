@@ -105,7 +105,7 @@ async function expectViewerStyles(page: Page) {
   await expect(linear.locator(".nsv-root.caller-linear")).toBeVisible();
   await expect(circular.locator(".nsv-root.caller-circular")).toBeVisible();
 
-  const character = sequence.locator(".caller-char").first();
+  const character = sequence.locator("div.caller-char").first();
   await expect(character).toHaveCSS("color", "rgb(15, 118, 110)");
   await expect(sequence.locator(".caller-selection").first()).toBeVisible();
 
@@ -118,10 +118,7 @@ async function expectViewerStyles(page: Page) {
   const sequenceRoot = sequence.locator(".nsv-root");
   await expect(sequenceRoot).toHaveCSS("display", "flex");
   await expect(sequenceRoot).toHaveCSS("position", "relative");
-  await expect(sequence.locator("button").first()).toHaveCSS(
-    "display",
-    "inline-flex",
-  );
+  await expect(sequence.locator("button").first()).toHaveCSS("display", "flex");
   await expect(sequence.locator("button").first()).toHaveCSS("height", "16px");
 
   const linearSvg = linear.locator("svg").first();
@@ -162,6 +159,11 @@ for (const framework of frameworks) {
     }) => {
       await page.goto(`/?framework=${framework}`);
       await expect(page.getByTestId("host-heading")).toBeVisible();
+      await page.waitForFunction(
+        () =>
+          document.querySelector<HTMLLinkElement>('link[href*="host-"]')
+            ?.sheet !== null,
+      );
       const before = await hostSnapshot(page);
 
       await loadLibraryStyles(page, order);

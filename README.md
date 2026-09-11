@@ -44,23 +44,6 @@ them with your application's Tailwind configuration. See the
 
 [Documentation](https://docs.nitro.bio/SequenceViewer/)
 
-Alignment is an explicit opt-in. Supply both `enableAlignment` and a
-`setSequences` callback to show an active Align action:
-
-```tsx
-<SequenceViewer
-  sequences={sequences}
-  setSequences={setSequences}
-  enableAlignment
-  alignmentConfig={{ urlCDN: "https://assets.example.com/biowasm" }}
-  // ...the viewer's other props
-/>
-```
-
-Omit `alignmentConfig.urlCDN` to load the pinned alignment tool assets from the
-Biowasm CDN. See [the alignment deployment guide](./docs/issue-80/alignment.md)
-for self-hosting and browser security requirements.
-
 ### Circular Viewer
 
 [Documentation](https://docs.nitro.bio/CircularViewer/)

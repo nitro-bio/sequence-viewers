@@ -27,7 +27,7 @@ for (const [route, major] of [
       page.getByTestId("linear-viewer").locator("svg"),
     ).toBeVisible();
     await expect(
-      page.getByTestId("circular-viewer").locator("svg"),
+      page.getByTestId("circular-viewer").locator("svg").first(),
     ).toBeVisible();
     await page.getByTestId("sequence-viewer").getByRole("combobox").click();
     await expect(

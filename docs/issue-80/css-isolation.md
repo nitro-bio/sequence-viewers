@@ -54,6 +54,13 @@ The component color tokens are:
 - `--nsv-color-sequences-mismatch`
 - `--nsv-color-sequences-gap`
 
+Version 1 resolved its inline sequence tokens through global Tailwind variables
+such as `--color-emerald-700` and `--color-zinc-800`. Those host theme variables
+no longer affect library defaults. Move viewer-specific overrides to the
+`--nsv-color-sequences-*` tokens above; global `--color-sequences-*` overrides
+were not reliable hooks in the previous inline theme. This is an intentional
+version-2 theming change.
+
 Override them on a viewer root. Radix Select renders outside that root, so put
 portal-specific foreground and background overrides on `.nsv-portal` as well:
 
@@ -79,7 +86,10 @@ The 1.4.1 npm tarball and a clean build from baseline
 `ddb06c008717d225019a15785eb56fb6f9dacaeb` emitted identical CSS
 (`eafea0d75297b9595b532b8134c72d7cb26ccec3c6602658a61b05babe0b3394`).
 That stylesheet included Tailwind Preflight selectors for host headings, lists,
-buttons, inputs, and all elements.
+buttons, inputs, and all elements. The same browser host-style comparison was
+run in a disposable test environment with the actual 1.4.1 stylesheet substituted
+as fixture data. It fails as expected: host headings change size/weight/margins,
+and host buttons and inputs lose native borders and padding.
 
 The packed-package browser suite loads the version-2 stylesheet before and
 after a plain host stylesheet, Tailwind 3, and Tailwind 4. It compares computed

@@ -68,6 +68,12 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/e2e/**",
+      "**/.worktrees/**",
+    ],
     environment: "jsdom",
     setupFiles: ["./setupTests.ts"],
     env: {

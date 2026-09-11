@@ -280,6 +280,17 @@ export function useMafftEinsi({
       if (!clientRef.current) {
         const construction = { started: false };
         const promise = loadAioli().then((AioliConstructor) => {
+          const operationIsCurrent =
+            mountedRef.current &&
+            operationRef.current === operation &&
+            lifecycleRevisionRef.current === lifecycleRevision &&
+            enabledRef.current &&
+            makeConfigKey(configRef.current) === configKey;
+          if (!operationIsCurrent) {
+            throw new Error(
+              "Alignment operation was invalidated before worker construction.",
+            );
+          }
           construction.started = true;
           const aioliConfig = {
             debug: operationConfig.debug ?? false,

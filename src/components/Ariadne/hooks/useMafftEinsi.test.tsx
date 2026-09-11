@@ -191,6 +191,67 @@ describe("useMafftEinsi", () => {
     expect(onAligned).toHaveBeenCalledTimes(2);
   });
 
+  test("uses a new configuration when it changes while the module is loading", async () => {
+    const moduleLoad = deferred<typeof Aioli>();
+    const client = makeClient(async (command) =>
+      command.startsWith("cat ")
+        ? outputForMountedFasta(client.getMountedFasta())
+        : "",
+    );
+    const AioliConstructor = vi.fn(function () {
+      return Promise.resolve(client);
+    }) as unknown as typeof Aioli;
+    mockedLoadAioli.mockReturnValue(moduleLoad.promise);
+    const onAligned = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ config }) =>
+        useMafftEinsi({ sequences: ["acg", "ag"], onAligned, config }),
+      {
+        initialProps: { config: { urlCDN: "https://assets-a.example.test" } },
+      },
+    );
+
+    let obsoleteRun!: Promise<void>;
+    act(() => {
+      obsoleteRun = result.current.run();
+    });
+    await waitFor(() => expect(mockedLoadAioli).toHaveBeenCalledOnce());
+    rerender({ config: { urlCDN: "https://assets-b.example.test" } });
+    moduleLoad.resolve(AioliConstructor);
+    await act(async () => obsoleteRun);
+
+    expect(AioliConstructor).not.toHaveBeenCalled();
+    expect(result.current.state.status).toBe("idle");
+
+    await act(async () => result.current.run());
+    expect(AioliConstructor).toHaveBeenCalledOnce();
+    expect(AioliConstructor).toHaveBeenCalledWith(expect.any(Array), {
+      urlCDN: "https://assets-b.example.test",
+      debug: false,
+    });
+    expect(onAligned).toHaveBeenCalledOnce();
+  });
+
+  test("does not construct a worker when unmounted during module loading", async () => {
+    const moduleLoad = deferred<typeof Aioli>();
+    const AioliConstructor = vi.fn() as unknown as typeof Aioli;
+    mockedLoadAioli.mockReturnValue(moduleLoad.promise);
+    const { result, unmount } = renderHook(() =>
+      useMafftEinsi({ sequences: ["acg", "ag"], onAligned: vi.fn() }),
+    );
+
+    let runPromise!: Promise<void>;
+    act(() => {
+      runPromise = result.current.run();
+    });
+    await waitFor(() => expect(mockedLoadAioli).toHaveBeenCalledOnce());
+    unmount();
+    moduleLoad.resolve(AioliConstructor);
+    await runPromise;
+
+    expect(AioliConstructor).not.toHaveBeenCalled();
+  });
+
   test("defaults Aioli debugging off and removes files created by the run", async () => {
     const client = makeClient(async (command) =>
       command.startsWith("cat ")

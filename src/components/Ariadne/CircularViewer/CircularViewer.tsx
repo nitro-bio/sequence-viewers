@@ -15,15 +15,25 @@ import { stackAnnsByType } from "..";
 import { CircularAnnotationGutter } from "./CircularAnnotations";
 import { CircularIndex } from "./CircularIndex";
 import { clampSlice, findIndexFromAngle, genArc } from "./circularUtils";
+import { ViewerValidationMessages } from "../ViewerValidationMessages";
+import {
+  normalizeAnnotationsInput,
+  resolveValidationMode,
+  validateViewerInput,
+  type ValidationMode,
+} from "../validation";
 
 export interface Props {
   sequence: string;
-  annotations: Annotation[];
+  annotations?: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection) => void;
   containerClassName?: string;
   svgSizePX?: number;
   svgPadding?: number;
+  validationMode?: ValidationMode;
+  /** @deprecated Use validationMode. */
+  noValidate?: boolean;
 }
 
 export const CircularViewer = ({
@@ -34,7 +44,21 @@ export const CircularViewer = ({
   containerClassName,
   svgSizePX = 300,
   svgPadding = 20,
+  validationMode,
+  noValidate,
 }: Props) => {
+  const annotationsInput = normalizeAnnotationsInput(annotations);
+  const validation = useMemo(
+    () =>
+      validateViewerInput({
+        sequences: [sequence],
+        annotations: annotationsInput,
+        mode: resolveValidationMode({ validationMode, noValidate }),
+      }),
+    [annotationsInput, noValidate, sequence, validationMode],
+  );
+  const validatedSequence = validation.sequences[0] ?? "";
+  const validatedAnnotations = validation.annotations;
   const { cx, cy, sizeX, sizeY, radius } = {
     cx: svgSizePX / 2,
     cy: svgSizePX / 2,
@@ -42,15 +66,20 @@ export const CircularViewer = ({
     sizeY: svgSizePX,
     radius: (svgSizePX - (svgPadding + 2)) / 2, // padding +2 to account for stroke width
   };
-  const stackedAnnotations = stackAnnsByType(annotations);
+  const stackedAnnotations = validation.hasUnsafeSequenceData
+    ? []
+    : stackAnnsByType(validatedAnnotations);
   const annotatedSequence = useMemo(
     function memoize() {
+      if (validation.hasUnsafeSequenceData) {
+        return [];
+      }
       return getAnnotatedSequence({
-        sequence,
-        stackedAnnotations: getStackedAnnotations(annotations),
+        sequence: validatedSequence,
+        stackedAnnotations: getStackedAnnotations(validatedAnnotations),
       });
     },
-    [sequence, annotations],
+    [validatedSequence, validatedAnnotations, validation.hasUnsafeSequenceData],
   );
 
   if (annotatedSequence && selection && annotatedSequence.length > 0) {
@@ -62,6 +91,15 @@ export const CircularViewer = ({
   }
   const selectionRef = useRef<SVGSVGElement>(null);
 
+  if (validation.hasUnsafeSequenceData) {
+    return (
+      <ViewerValidationMessages
+        diagnostics={validation.diagnostics}
+        sequenceUnavailable
+      />
+    );
+  }
+
   return (
     <div
       className={classNames(
@@ -69,6 +107,7 @@ export const CircularViewer = ({
         containerClassName,
       )}
     >
+      <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
         ref={selectionRef}
         viewBox={`0 0 ${sizeX} ${sizeY}`}

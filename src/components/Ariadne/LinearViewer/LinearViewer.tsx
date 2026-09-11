@@ -14,10 +14,17 @@ import {
   StackedAnnotation,
 } from "../types";
 import { LinearAnnotationGutter } from "./LinearAnnotationGutter";
+import { ViewerValidationMessages } from "../ViewerValidationMessages";
+import {
+  normalizeAnnotationsInput,
+  resolveValidationMode,
+  validateViewerInput,
+  type ValidationMode,
+} from "../validation";
 
 export interface Props {
   sequences: string[];
-  annotations: Annotation[];
+  annotations?: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection | null) => void;
   onDoubleClick?: () => void;
@@ -30,6 +37,9 @@ export interface Props {
   }) => string | string;
   mismatchClassName?: (mismatchedBase: AnnotatedBase) => string;
   stackingFn?: (annotations: Annotation[]) => StackedAnnotation[];
+  validationMode?: ValidationMode;
+  /** @deprecated Use validationMode. */
+  noValidate?: boolean;
 }
 
 const MISMATCH_DIST_PERC_THRESHOLD = 0.01;
@@ -46,29 +56,52 @@ export const LinearViewer = (props: Props) => {
     containerClassName,
     sequenceClassName,
     stackingFn,
+    validationMode,
+    noValidate,
   } = props;
+
+  const annotationsInput = normalizeAnnotationsInput(annotations);
+  const validation = useMemo(
+    () =>
+      validateViewerInput({
+        sequences,
+        annotations: annotationsInput,
+        mode: resolveValidationMode({ validationMode, noValidate }),
+      }),
+    [annotationsInput, noValidate, sequences, validationMode],
+  );
+  const validatedSequences = validation.sequences;
+  const validatedAnnotations = validation.annotations;
 
   const stackedAnnotations = useMemo(
     function memoize() {
+      if (validation.hasUnsafeSequenceData) {
+        return [];
+      }
       // if a stacking function is provided, use it, otherwise use the default which
       // stacks annotations to prevent overlap.
       return stackingFn
-        ? stackingFn(annotations)
+        ? stackingFn(validatedAnnotations)
         : stackAnnotationsNoOverlap(
-            annotations,
-            Math.max(...sequences.map((seq) => seq.length)),
+            validatedAnnotations,
+            Math.max(...validatedSequences.map((seq) => seq.length)),
           );
     },
-    [annotations],
+    [
+      stackingFn,
+      validatedAnnotations,
+      validatedSequences,
+      validation.hasUnsafeSequenceData,
+    ],
   );
 
   const annotatedSequences = useMemo(
     function memoize() {
-      return sequences.map((sequence) =>
+      return validatedSequences.map((sequence) =>
         getAnnotatedSequence({ sequence, stackedAnnotations }),
       );
     },
-    [sequences, stackedAnnotations],
+    [validatedSequences, stackedAnnotations],
   );
 
   const baseSequence = annotatedSequences[0];
@@ -78,7 +111,7 @@ export const LinearViewer = (props: Props) => {
   // const basesPerTick = Math.floor(sequence.length / numberOfTicks);
 
   const SVG_WIDTH = 500;
-  const SVG_HEIGHT = sequences.length * 10 + 10;
+  const SVG_HEIGHT = validatedSequences.length * 10 + 10;
 
   const getSequenceClassNameProp = ({
     sequenceIdx,
@@ -98,8 +131,18 @@ export const LinearViewer = (props: Props) => {
     );
   };
 
+  if (validation.hasUnsafeSequenceData) {
+    return (
+      <ViewerValidationMessages
+        diagnostics={validation.diagnostics}
+        sequenceUnavailable
+      />
+    );
+  }
+
   return (
     <div className={containerClassName || ""}>
+      <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <svg
         ref={selectionRef}
         className={classNames("font-thin select-none")}
@@ -178,8 +221,9 @@ const SequenceLine = ({
       maxEnd = otherEnd;
     }
   });
-  const startPerc = start / maxEnd;
-  const endPerc = end / maxEnd;
+  const coordinateDenominator = maxEnd === 0 ? 1 : maxEnd;
+  const startPerc = start / coordinateDenominator;
+  const endPerc = maxEnd === 0 ? 1 : end / coordinateDenominator;
 
   // mismatches
   const mismatches = baseSequence.filter((base) => {
@@ -210,7 +254,7 @@ const SequenceLine = ({
         stroke="currentColor"
       />
       {mismatches.map((base) => {
-        const xPerc = (base.index / maxEnd) * 100;
+        const xPerc = (base.index / coordinateDenominator) * 100;
         const width = Math.max((1 / baseSequence.length) * 100, 0.01);
         const diff = xPerc - lastXPerc;
         if (diff < MISMATCH_DIST_PERC_THRESHOLD) {

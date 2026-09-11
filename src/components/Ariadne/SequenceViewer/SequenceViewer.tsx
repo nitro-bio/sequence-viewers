@@ -25,6 +25,13 @@ import {
 import { CopyButton } from "@ui/copy-button";
 import { Button } from "@ui/button/button";
 import { DownloadIcon } from "lucide-react";
+import { ViewerValidationMessages } from "../ViewerValidationMessages";
+import {
+  normalizeAnnotationsInput,
+  resolveValidationMode,
+  validateViewerInput,
+  type ValidationMode,
+} from "../validation";
 
 export const SequenceViewer = ({
   sequences,
@@ -38,11 +45,12 @@ export const SequenceViewer = ({
   hideMetadataBar,
   hideDownloadButton,
   noValidate,
+  validationMode,
   highlightMisalignments,
 }: {
   sequences: string[];
   setSequences?: (sequences: string[]) => void;
-  annotations: Annotation[];
+  annotations?: Annotation[];
   selection: AriadneSelection | null;
   setSelection: (selection: AriadneSelection | null) => void;
   containerClassName?: string;
@@ -56,7 +64,9 @@ export const SequenceViewer = ({
   selectionClassName?: string;
   hideMetadataBar?: boolean;
   hideDownloadButton?: boolean;
+  /** @deprecated Use validationMode. */
   noValidate?: boolean;
+  validationMode?: ValidationMode;
   highlightMisalignments?: boolean;
 }) => {
   const [hoveredPosition, setHoveredPosition] = useState<number | null>(null);
@@ -65,22 +75,41 @@ export const SequenceViewer = ({
     null,
   );
   const { state: alignState, run: runAlignment } = useMafftEinsi();
+  const annotationsInput = normalizeAnnotationsInput(annotations);
+  const validation = useMemo(
+    () =>
+      validateViewerInput({
+        sequences,
+        annotations: annotationsInput,
+        mode: resolveValidationMode({ validationMode, noValidate }),
+      }),
+    [annotationsInput, noValidate, sequences, validationMode],
+  );
+  const validatedSequences = validation.sequences;
+  const validatedAnnotations = validation.annotations;
   const stackedAnnotations = useMemo(
     function memoize() {
+      if (validation.hasUnsafeSequenceData) {
+        return [];
+      }
       return stackAnnotationsNoOverlap(
-        annotations,
-        Math.max(...sequences.map((seq) => seq.length)),
+        validatedAnnotations,
+        Math.max(...validatedSequences.map((seq) => seq.length)),
       );
     },
-    [annotations],
+    [
+      validatedAnnotations,
+      validatedSequences,
+      validation.hasUnsafeSequenceData,
+    ],
   );
   const annotatedSequences = useMemo(
     function memoize() {
-      return sequences.map((sequence) =>
-        getAnnotatedSequence({ sequence, stackedAnnotations, noValidate }),
+      return validatedSequences.map((sequence) =>
+        getAnnotatedSequence({ sequence, stackedAnnotations }),
       );
     },
-    [sequences, stackedAnnotations],
+    [validatedSequences, stackedAnnotations],
   );
   useEffect(
     function mountCopyHandler() {
@@ -127,8 +156,19 @@ export const SequenceViewer = ({
     stackedAnnotations,
     highlightMisalignments,
   ]);
+
+  if (validation.hasUnsafeSequenceData) {
+    return (
+      <ViewerValidationMessages
+        diagnostics={validation.diagnostics}
+        sequenceUnavailable
+      />
+    );
+  }
+
   return (
     <>
+      <ViewerValidationMessages diagnostics={validation.diagnostics} />
       <div
         className={classNames(
           "relative isolate flex flex-wrap",
@@ -148,7 +188,7 @@ export const SequenceViewer = ({
             hideDownloadButton={hideDownloadButton}
             onAlign={async () => {
               if (!setSequences) return;
-              const fasta = sequences
+              const fasta = validatedSequences
                 .map((seq, idx) => `>Sequence_${idx + 1}\n${seq}`)
                 .join("\n");
 

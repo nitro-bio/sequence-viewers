@@ -5,7 +5,7 @@
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",
-    "build-css": "npx @tailwindcss/cli -i src/index.css -o ./nitro-sequence-viewers.css --minify && mv ./nitro-sequence-viewers.css ./dist/nitro-sequence-viewers.css",
+    "build-css": "tailwindcss -i src/index.css -o ./dist/nitro-sequence-viewers.css --minify",
     "dev": "pnpm storybook dev -p 6006",
     "build-storybook": "storybook build",
     "format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\" --config package.json",
@@ -17,7 +17,9 @@
     "build:watch": "nodemon --watch src --ext js,jsx,ts,tsx,json,css,scss,html --exec pnpm build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "test:packed:prepare": "node e2e/packed-package.mjs",
+    "test:packed": "pnpm test:packed:prepare && playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@biowasm/aioli": "^3.2.1",
@@ -87,11 +89,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/nitro-sequence-viewers.es.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/nitro-sequence-viewers.es.js"
     },
     "./dist/nitro-sequence-viewers.css": "./dist/nitro-sequence-viewers.css",
-    "./dist/nitro.css": "./dist/nitro-sequence-viewers.css"
+    "./dist/nitro.css": "./dist/nitro-sequence-viewers.css",
+    "./styles.css": "./dist/nitro-sequence-viewers.css"
   },
   "description": "collection of ui components",
   "keywords": [
@@ -104,5 +107,8 @@
       "prettier-plugin-tailwindcss"
     ]
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "sideEffects": [
+    "**/*.css"
+  ]
 }

@@ -73,8 +73,10 @@ hosting must allow the application origin with CORS. The public Biowasm assets
 were verified to return `Access-Control-Allow-Origin: *`, JavaScript content
 type for tool loaders, and `application/wasm` for WebAssembly files.
 
-Aioli 3.2.1 creates its worker from a blob and loads each tool script inside
-that worker. A restrictive Content Security Policy therefore needs to allow:
+Aioli 3.2.1 creates its worker from a blob, calls `importScripts()` for each
+tool's JavaScript, and resolves the corresponding WebAssembly file from the
+same tool/version directory. Because a blob worker inherits its creator's CSP,
+a restrictive policy needs to allow:
 
 - `blob:` in `worker-src`.
 - the executable asset origin in `script-src` and `connect-src`.
@@ -83,7 +85,10 @@ that worker. A restrictive Content Security Policy therefore needs to allow:
 
 For same-origin self-hosting, the asset-origin entries are normally `'self'`.
 Test the policy in every supported browser because CSP fallback behavior for
-workers varies when `worker-src` is omitted.
+workers varies when `worker-src` is omitted. These directives were derived from
+the installed Aioli worker implementation and browser CSP rules; the packed
+browser smoke test blocks the public CDN and proves same-origin asset loading,
+but does not impose a production CSP header.
 
 ## Completion and failures
 
@@ -105,4 +110,6 @@ Failures render an accessible alert and turn the action into Retry alignment.
 The hook removes files created by each operation through Aioli's documented
 virtual filesystem API. Aioli 3.2.1 exposes no public worker termination method,
 so the client is retained and reused for the mounted viewer rather than calling
-an unsupported cleanup method.
+an unsupported cleanup method. Unmounting blocks state and callback updates and
+an in-flight operation still removes its files, but this Aioli version cannot be
+asked to terminate an idle worker explicitly.

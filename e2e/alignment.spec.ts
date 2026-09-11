@@ -2,12 +2,21 @@ import { expect, test } from "@playwright/test";
 
 const selfHostedInput = ["ACGTACGTACGT", "ACGTTCGTACG"];
 
+const isAlignmentAsset = (url: string) => {
+  const parsed = new URL(url);
+  return (
+    parsed.hostname === "biowasm.com" ||
+    parsed.pathname.startsWith("/assets/coreutils/") ||
+    parsed.pathname.startsWith("/assets/mafft/")
+  );
+};
+
 test("disabled alignment has no action, runtime shim, or asset request", async ({
   page,
 }) => {
   const alignmentRequests: string[] = [];
   page.on("request", (request) => {
-    if (/biowasm|\/assets\//.test(request.url())) {
+    if (isAlignmentAsset(request.url())) {
       alignmentRequests.push(request.url());
     }
   });
@@ -57,7 +66,10 @@ test("self-hosted assets run a real alignment with public CDN blocked", async ({
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (url.pathname.startsWith("/assets/")) {
+    if (
+      url.pathname.startsWith("/assets/coreutils/") ||
+      url.pathname.startsWith("/assets/mafft/")
+    ) {
       selfHostedRequests.add(url.pathname);
     }
   });

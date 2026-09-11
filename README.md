@@ -22,11 +22,19 @@ npm install @nitro-bio/sequence-viewers
 Import the stylesheet once in your application entry point:
 
 ```ts
-import "@nitro-bio/sequence-viewers/dist/nitro-sequence-viewers.css";
+import "@nitro-bio/sequence-viewers/styles.css";
 ```
 
-The legacy `@nitro-bio/sequence-viewers/dist/nitro.css` import resolves to the
-same stylesheet for compatibility.
+Both previous imports, `@nitro-bio/sequence-viewers/dist/nitro.css` and
+`@nitro-bio/sequence-viewers/dist/nitro-sequence-viewers.css`, resolve to the same
+stylesheet for compatibility.
+
+The library stylesheet provides component styles without resetting your host
+page. **Provide your own application reset if your application needs one.**
+Library utilities and theme variables use the `nsv` prefix. Caller-provided class
+strings are preserved verbatim; define those classes in your own CSS or compile
+them with your application's Tailwind configuration. See the
+[CSS migration guide](docs/issue-80/css-isolation.md) for theming and portal details.
 
 ### Sequence Viewer
 
@@ -39,6 +47,63 @@ same stylesheet for compatibility.
 ### Linear Viewer
 
 [Documentation](https://docs.nitro.bio/LinearViewer/)
+
+## Rendering and validation
+
+`SequenceViewer` accepts omitted annotations or `annotations={[]}` without
+repeating annotation generation on otherwise unchanged input. Empty sequences
+render a local empty state with no active copy, download, or alignment operations.
+Sequence coordinates and established padding behavior are preserved.
+
+All three viewers validate structure and recover by default. Malformed
+annotations are excluded with a local diagnostic; sequence data that cannot be
+displayed safely produces a local placeholder. Rendering remains alphabet-agnostic:
+validation does not replace residues, change case, or shift coordinates.
+
+Use `validationMode="strict"` when rendering failures should throw. The
+`noValidate` prop is deprecated. An explicit `validationMode` always wins;
+otherwise `noValidate={true}` maps to recovery, explicit `false` maps to strict,
+and omission uses recovery. This is structural validation, not an alphabet
+validation bypass. Public parsing helpers retain their documented throwing
+behavior, and exported nucleotide/amino-acid schemas remain available for callers
+who want to validate alphabets separately.
+
+See the [validation migration guide](docs/issue-80/validation.md) for examples and
+regression coverage.
+
+## Optional browser alignment
+
+Alignment is disabled by default. Passing `setSequences` alone does not enable it.
+Opt in explicitly and supply an update callback:
+
+```tsx
+<SequenceViewer
+  sequences={sequences}
+  setSequences={setSequences}
+  selection={selection}
+  setSelection={setSelection}
+  charClassName={() => "my-residue"}
+  enableAlignment
+  alignmentConfig={{ debug: false }}
+/>
+```
+
+`alignmentConfig` accepts `urlCDN?: string` and `debug?: boolean` (default `false`).
+An enabled viewer without an update callback shows a disabled alignment action.
+Assets and Aioli initialization remain lazy until an alignment action runs.
+
+By default, alignment fetches executable JavaScript and WebAssembly tool assets
+from `https://biowasm.com/cdn/v3`: MAFFT **7.520** (`tbfast`, `dvtditr`) and
+Coreutils **8.32** (`cat`), using the locked Aioli **3.2.1** implementation.
+Alignment computes locally in a browser worker; sequence input is supplied to that
+worker rather than uploaded as an alignment service request. Installing Aioli
+from npm does **not** eliminate runtime tool-asset downloads.
+
+For self-hosting, set `alignmentConfig={{ urlCDN: "https://your-host.example/assets" }}`
+and serve the complete documented asset directory. See the
+[alignment migration and self-hosting guide](docs/issue-80/alignment.md) for the
+exact files, browser/CSP/CORS requirements, error/retry behavior, and the distinction
+between mocked tests and real browser evidence.
 
 ## Development
 

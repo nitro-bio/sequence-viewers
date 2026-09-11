@@ -130,6 +130,14 @@ export function App() {
           containerClassName="caller-container"
         />
       </section>
+      <section data-testid="circular-diagnostic">
+        <CircularViewer
+          sequence="ACGT"
+          annotations={[{ ...annotations[0], start: Number.NaN }]}
+          selection={null}
+          setSelection={setSelection}
+        />
+      </section>
       <section data-testid="standalone-ticks">
         <ReferenceTicks
           sequence={getAnnotatedSequence({

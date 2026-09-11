@@ -148,6 +148,20 @@ async function expectViewerStyles(page: Page) {
   await expect(diagnostic.locator("ul")).toHaveCSS("list-style-type", "disc");
   await expect(diagnostic.locator("..")).toHaveClass(/caller-container/);
 
+  const circularDiagnostic = page.getByTestId("circular-diagnostic");
+  const diagnosticBox = await circularDiagnostic
+    .getByRole("status")
+    .boundingBox();
+  const diagramBox = await circularDiagnostic
+    .locator("svg")
+    .first()
+    .boundingBox();
+  expect(diagramBox?.width).toBeCloseTo(300);
+  expect(diagramBox?.height).toBeCloseTo(300);
+  expect(diagramBox!.y).toBeGreaterThanOrEqual(
+    diagnosticBox!.y + diagnosticBox!.height,
+  );
+
   const ticks = page.getByTestId("standalone-ticks");
   await expect(ticks.locator(":scope > .nsv-root")).toHaveCSS(
     "box-sizing",

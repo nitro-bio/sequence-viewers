@@ -29,6 +29,7 @@
 
   :where(.nsv-circular-root) {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: var(--nsv-color-sequences-primary, oklch(50.8% 0.118 165.612));

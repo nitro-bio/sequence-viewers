@@ -23,6 +23,10 @@ module.exports = {
     },
   },
   rules: {
+    "react-hooks/exhaustive-deps": [
+      "warn",
+      { additionalHooks: "useIsomorphicLayoutEffect" },
+    ],
     "react/react-in-jsx-scope": "off",
     "@typescript-eslint/ban-ts-comment": "warn",
     "@typescript-eslint/no-empty-function": "off",

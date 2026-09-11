@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { loadAioli } from "@utils/loadAioli";
@@ -541,4 +542,43 @@ describe("useMafftEinsi", () => {
     });
     expect(result.current.state.status).toBe("idle");
   });
+});
+
+test("runs with the latest committed input and configuration before passive effects", async () => {
+  const client = makeClient(async (command) =>
+    command.startsWith("cat ") ? client.getMountedFasta() : "",
+  );
+  const Constructor = installClient(client);
+  const onAligned = vi.fn();
+  let operation: Promise<void> | undefined;
+  const { rerender } = renderHook(
+    ({ sequences, config, runOnCommit }) => {
+      const alignment = useMafftEinsi({ sequences, config, onAligned });
+      useLayoutEffect(() => {
+        if (runOnCommit) operation = alignment.run();
+      }, [alignment.run, runOnCommit]);
+      return alignment;
+    },
+    {
+      initialProps: {
+        sequences: ["A", "A"],
+        config: { urlCDN: "https://before.example/assets" },
+        runOnCommit: false,
+      },
+    },
+  );
+  rerender({
+    sequences: ["T", "T"],
+    config: { urlCDN: "https://after.example/assets" },
+    runOnCommit: true,
+  });
+  await act(async () => {
+    await operation;
+  });
+  expect(Constructor).toHaveBeenCalledTimes(1);
+  expect(Constructor).toHaveBeenCalledWith(expect.anything(), {
+    urlCDN: "https://after.example/assets",
+    debug: false,
+  });
+  expect(onAligned).toHaveBeenCalledWith(["T", "T"]);
 });

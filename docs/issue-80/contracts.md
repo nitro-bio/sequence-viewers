@@ -13,7 +13,7 @@
 
 ## Baseline verification
 
-`pnpm lint`, `pnpm test`, `pnpm format`, and `pnpm build:ci` all passed. Six tests in one file. Existing lint warning: utils.ts constant condition at line 425; React version configuration warning and Node deprecation notices also present. Fresh output and npm 1.4.1 CSS, main JS and Aioli chunk are byte-for-byte identical:
+`pnpm lint`, `pnpm test`, `pnpm format`, and `pnpm build:ci` all passed. Six tests in one file. Existing lint warning: utils.ts constant condition at line 425; React version configuration warning and Node deprecation notices also present. `pnpm peers check` fails on both baseline and shared-tooling trees: the unused Storybook dark-mode addon expects Storybook 7 components/theming, while these resolve to 8.4.7 and the application uses Storybook 9.0.18. This is a pre-existing tooling mismatch, separate from the package React peer contract. Fresh output and npm 1.4.1 CSS, main JS and Aioli chunk are byte-for-byte identical:
 
 | Artifact    | SHA-256                                                          |
 | ----------- | ---------------------------------------------------------------- |

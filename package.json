@@ -5,7 +5,7 @@
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",
-    "build-css": "tailwindcss -i src/index.css -o ./dist/nitro-sequence-viewers.css --minify",
+    "build-css": "node node_modules/@tailwindcss/cli/dist/index.mjs -i src/index.css -o ./dist/nitro-sequence-viewers.css --minify",
     "dev": "pnpm storybook dev -p 6006",
     "build-storybook": "storybook build",
     "format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\" --config package.json",

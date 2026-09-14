@@ -71,68 +71,25 @@ measurements are not attributed to this implementation.
 
 ## Interaction and accessibility
 
-Residue selection is pointer-driven. Residues are non-selectable `div` elements
-with mouse handlers; they are not focusable controls and do not expose a
-built-in keyboard selection model. Annotation segments are also clickable and
-hoverable `div` elements without keyboard activation. Hovered coordinates and
-annotation metadata therefore have the same pointer-only limitation.
+`SequenceViewer` exposes one focusable multi-select residue list. Its active
+descendant carries the sequence number, zero-based coordinate, residue or gap,
+and annotation count. Keyboard range changes are announced in a short live
+status; the sequence strings themselves are not copied into a live region.
+Arrow, Home, End, Shift-selection, single-residue selection, clearing, and
+annotation inspection/activation are documented in the [usage guide](usage.md).
 
 The metadata bar exposes the sequence picker as a labeled combobox and uses
 named buttons for copy, download, and alignment actions. The packed consumer
-suite exercises these controls in Chromium with pointer input. It does not
-currently prove end-to-end keyboard navigation or screen-reader behavior.
-
-For a keyboard-accessible workflow, keep selection controlled and provide host
-controls that match the needs of your application. For example:
-
-```tsx
-import { useState } from "react";
-import {
-  SequenceViewer,
-  type AriadneSelection,
-} from "@nitro-bio/sequence-viewers";
-
-const sequence = "ATGACCTG";
-
-export function AccessibleSelectionExample() {
-  const [selection, setSelection] = useState<AriadneSelection | null>(null);
-
-  return (
-    <section aria-label="Sequence inspection">
-      <button
-        type="button"
-        onClick={() =>
-          setSelection({
-            start: 0,
-            end: sequence.length - 1,
-            direction: "forward",
-          })
-        }
-      >
-        Select all residues
-      </button>
-      <button type="button" onClick={() => setSelection(null)}>
-        Clear residue selection
-      </button>
-      <output aria-live="polite">
-        {selection
-          ? `Selected residues ${selection.start} through ${selection.end}`
-          : "No residues selected"}
-      </output>
-      <SequenceViewer
-        sequences={[sequence]}
-        selection={selection}
-        setSelection={setSelection}
-      />
-    </section>
-  );
-}
-```
+suite exercises pointer and keyboard selection in Chromium. Automated semantic
+and browser checks do not prove behavior with every screen reader.
 
 Applications that must expose the sequence itself to assistive technology
 should provide a separate labeled text or table representation appropriate to
-their users. Do not rely on residue color, hover metadata, or the visual grid as
-the only description of sequence differences.
+their users. The built-in list is optimized for residue inspection and does not
+provide a continuous reading mode or an alignment-table summary. LinearViewer
+and CircularViewer retain their existing pointer selection models. Test the
+SequenceViewer with the browser and assistive technology combinations required
+by your application.
 
 ## Browser scope
 

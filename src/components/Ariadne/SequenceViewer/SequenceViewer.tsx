@@ -20,7 +20,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
+import {
+  defaultRangeExtractor,
+  useVirtualizer,
+  useWindowVirtualizer,
+} from "@tanstack/react-virtual";
 import type {
   AnnotatedBase,
   Annotation,
@@ -50,6 +54,10 @@ import {
 } from "../validation";
 import { clampSlice } from "../CircularViewer/circularUtils";
 import { getMaxSequenceLength } from "../viewerUtils";
+import {
+  getResidueId,
+  useSequenceKeyboardNavigation,
+} from "./sequenceKeyboard";
 
 type CharClassName = ({
   base,
@@ -224,31 +232,6 @@ export const SequenceViewer = ({
       stackedAnnotations,
     ],
   );
-  useEffect(
-    function mountCopyHandler() {
-      if (!hasSequenceData || !displayedSelection) {
-        return;
-      }
-      const copyHandler = (e: ClipboardEvent) => {
-        const stringToCopy = getStringToCopy(
-          annotatedSequences,
-          displayedSelection,
-          safeSeqIdxToCopy,
-        );
-        if (!stringToCopy) {
-          return;
-        }
-        e.clipboardData?.setData("text/plain", stringToCopy);
-        e.preventDefault();
-      };
-      document.addEventListener("copy", copyHandler);
-      return function unmountCopyHandler() {
-        document.removeEventListener("copy", copyHandler);
-      };
-    },
-    [annotatedSequences, displayedSelection, hasSequenceData, safeSeqIdxToCopy],
-  );
-
   const memoizedSeqContent = useMemo(() => {
     return (
       <SeqContent
@@ -261,6 +244,7 @@ export const SequenceViewer = ({
         charClassName={charClassName}
         selectionClassName={selectionClassName}
         highlightMisalignments={highlightMisalignments}
+        copySequenceIdx={safeSeqIdxToCopy}
       />
     );
   }, [
@@ -271,6 +255,7 @@ export const SequenceViewer = ({
     selectionClassName,
     stackedAnnotations,
     updateSelection,
+    safeSeqIdxToCopy,
   ]);
 
   if (validation.hasUnsafeSequenceData) {
@@ -335,6 +320,8 @@ export const SeqContent = ({
   charClassName,
   selectionClassName,
   highlightMisalignments,
+  copySequenceIdx = 0,
+  ensurePositionVisible,
 }: {
   annotatedSequences: AnnotatedBase[][];
   selection: AriadneSelection | null;
@@ -351,6 +338,11 @@ export const SeqContent = ({
   }) => string;
   selectionClassName?: string;
   highlightMisalignments?: boolean;
+  copySequenceIdx?: number;
+  ensurePositionVisible?: (active: {
+    sequenceIdx: number;
+    position: number;
+  }) => void;
 }) => {
   const VIRTUAL_CELL_THRESHOLD = 5_000;
   const mouseDown = useRef(false);
@@ -365,6 +357,9 @@ export const SeqContent = ({
   const [scrollMargin, setScrollMargin] = useState(0);
   const previousColumnsRef = useRef<number>();
   const visibleLineRef = useRef(0);
+  const virtualRevealRef = useRef<
+    (active: { sequenceIdx: number; position: number }) => void
+  >(() => {});
   const handleMouseUp = useCallback(() => {
     mouseDown.current = false;
   }, []);
@@ -427,6 +422,70 @@ export const SeqContent = ({
       }),
     [annotatedSequences],
   );
+  const [announcedAnnotation, setAnnouncedAnnotation] =
+    useState<StackedAnnotation | null>(null);
+  const annotationCursor = useRef({ position: -1, index: -1 });
+  useEffect(() => {
+    if (
+      announcedAnnotation &&
+      !orderedAnnotations.includes(announcedAnnotation)
+    ) {
+      annotationCursor.current = { position: -1, index: -1 };
+      setAnnouncedAnnotation(null);
+    }
+  }, [announcedAnnotation, orderedAnnotations]);
+  const keyboard = useSequenceKeyboardNavigation({
+    rowLengths: annotatedSequences.map((sequence) => sequence.length),
+    setSelection,
+    ensurePositionVisible: (active) => {
+      ensurePositionVisible?.(active);
+      virtualRevealRef.current(active);
+    },
+    onActivePositionChange: () => {
+      annotationCursor.current = { position: -1, index: -1 };
+      setAnnouncedAnnotation(null);
+      setActiveAnnotation(null);
+    },
+    onAnnotationCommand: (position, activate) => {
+      const annotationsHere = orderedAnnotations.filter((candidate) =>
+        baseInSelection({
+          baseIndex: position,
+          selection: candidate,
+          sequenceLength: maxSequenceLength,
+        }),
+      );
+      if (annotationsHere.length === 0) {
+        setAnnouncedAnnotation(null);
+        return;
+      }
+      const cursor = annotationCursor.current;
+      const nextIndex =
+        cursor.position === position
+          ? (cursor.index + (activate ? 0 : 1)) % annotationsHere.length
+          : 0;
+      const annotation = annotationsHere[nextIndex];
+      annotationCursor.current = { position, index: nextIndex };
+      setAnnouncedAnnotation(annotation);
+      setActiveAnnotation(annotation);
+      if (annotation && activate) {
+        annotation.onClick?.(toAnnotationCallbackPayload(annotation));
+      }
+    },
+  });
+  const instructionsId = `${keyboard.instanceId}-instructions`;
+  const statusId = `${keyboard.instanceId}-status`;
+  const selectedCount = selection
+    ? selection.start <= selection.end
+      ? selection.end - selection.start + 1
+      : maxSequenceLength - selection.start + selection.end + 1
+    : 0;
+  const selectionStatus = announcedAnnotation
+    ? `${announcedAnnotation.type} annotation${announcedAnnotation.text ? `, ${announcedAnnotation.text}` : ""}, ${announcedAnnotation.direction} direction, positions ${announcedAnnotation.start} through ${announcedAnnotation.end}.${announcedAnnotation.onClick ? " Press Shift+A to activate." : " No activation action."}`
+    : selection
+      ? selection.start > selection.end
+        ? `Selected wraparound positions ${selection.start} through ${maxSequenceLength - 1} and 0 through ${selection.end}, ${selectedCount} positions, ${selection.direction} direction.`
+        : `Selected positions ${selection.start} through ${selection.end}, ${selectedCount} positions, ${selection.direction} direction.`
+      : "No residues selected.";
 
   const useVirtualRows =
     maxSequenceLength * Math.max(annotatedSequences.length, 1) >
@@ -439,6 +498,24 @@ export const SeqContent = ({
   const annotationLineCount = maxAnnotationStack + 1;
   const linesPerBlock = annotatedSequences.length + annotationLineCount;
   const virtualLineCount = coordinateBlockCount * linesPerBlock;
+  const activeVirtualLine =
+    Math.floor(keyboard.activePosition / columnsPerRow) * linesPerBlock +
+    keyboard.activeRow;
+  const rangeExtractor = useCallback(
+    (range: Parameters<typeof defaultRangeExtractor>[0]) => {
+      const indexes = defaultRangeExtractor(range);
+      if (
+        activeVirtualLine >= 0 &&
+        activeVirtualLine < virtualLineCount &&
+        !indexes.includes(activeVirtualLine)
+      ) {
+        indexes.push(activeVirtualLine);
+        indexes.sort((a, b) => a - b);
+      }
+      return indexes;
+    },
+    [activeVirtualLine, virtualLineCount],
+  );
 
   useIsomorphicLayoutEffect(() => {
     if (!useVirtualRows) return;
@@ -499,6 +576,7 @@ export const SeqContent = ({
     getScrollElement: () => scrollElement,
     estimateSize: estimateLineSize,
     overscan: 3,
+    rangeExtractor,
     scrollMargin,
     enabled: useVirtualRows && Boolean(scrollElement),
     initialRect: { width: 800, height: 240 },
@@ -508,12 +586,19 @@ export const SeqContent = ({
     count: virtualLineCount,
     estimateSize: estimateLineSize,
     overscan: 3,
+    rangeExtractor,
     scrollMargin,
     enabled: useVirtualRows && !scrollElement,
     initialRect: { width: 800, height: 240 },
     useFlushSync: false,
   });
   const virtualizer = scrollElement ? elementVirtualizer : windowVirtualizer;
+  virtualRevealRef.current = ({ sequenceIdx, position }) => {
+    if (!useVirtualRows) return;
+    const line =
+      Math.floor(position / columnsPerRow) * linesPerBlock + sequenceIdx;
+    virtualizer.scrollToIndex(line, { align: "auto" });
+  };
   const virtualItems = virtualizer.getVirtualItems();
   const firstVirtualLine = virtualItems[0]?.index;
   const lastVirtualLine = virtualItems[virtualItems.length - 1]?.index;
@@ -571,13 +656,36 @@ export const SeqContent = ({
       base.base !== "-" &&
       firstSeqBase.base !== "-" &&
       base.base !== firstSeqBase.base;
+    const annotationCount = orderedAnnotations.filter((annotation) =>
+      baseInSelection({
+        baseIndex: baseIdx,
+        selection: annotation,
+        sequenceLength: maxSequenceLength,
+      }),
+    ).length;
 
     return (
       <div
+        id={getResidueId(keyboard.instanceId, sequenceIdx, baseIdx)}
+        role="option"
+        aria-posinset={sequenceIdx * maxSequenceLength + baseIdx + 1}
+        aria-setsize={annotatedSequences.length * maxSequenceLength}
+        aria-selected={
+          base.base !== " " &&
+          baseInSelection({
+            baseIndex: baseIdx,
+            selection,
+            sequenceLength: annotatedSequences[sequenceIdx].length,
+          })
+        }
+        aria-label={`Sequence ${sequenceIdx + 1}, position ${baseIdx}, ${base.base === " " ? "no residue" : base.base === "-" ? "gap" : base.base}${isMisaligned ? `, mismatch with ${firstSeqBase.base} in sequence 1` : ""}${annotationCount ? `, ${annotationCount} annotation${annotationCount === 1 ? "" : "s"}` : ""}`}
         key={`sequence-${sequenceIdx}-base-${baseIdx}`}
         className={classNames(
           "nsv:text-center nsv:whitespace-nowrap",
           virtualWidth !== undefined && "nsv:relative",
+          keyboard.activeRow === sequenceIdx &&
+            keyboard.activePosition === baseIdx &&
+            "nsv:ring-sequences-foreground nsv:ring-2 nsv:ring-offset-1",
         )}
         style={
           virtualWidth === undefined
@@ -595,8 +703,12 @@ export const SeqContent = ({
           }
         }}
         onMouseLeave={() => setHoveredPosition(null)}
-        onMouseDown={() => {
+        onMouseDown={(event) => {
           mouseDown.current = true;
+          keyboard.activateResidue(sequenceIdx, base.index);
+          event.currentTarget
+            .closest<HTMLElement>("[role=listbox]")
+            ?.focus({ preventScroll: true });
           setSelection({
             start: base.index,
             end: base.index,
@@ -638,6 +750,7 @@ export const SeqContent = ({
 
   const renderSmallColumn = (baseIdx: number) => (
     <div
+      role="presentation"
       className="nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between"
       key={`base-${baseIdx}`}
       data-sequence-position={baseIdx}
@@ -662,86 +775,167 @@ export const SeqContent = ({
 
   if (useVirtualRows) {
     return (
-      <div
-        ref={virtualRootRef}
-        className="nsv:relative nsv:w-full"
-        style={{
-          height: virtualizer.getTotalSize(),
-          overflowAnchor: "none",
-        }}
-        data-virtualized="true"
-        data-columns-per-row={columnsPerRow}
-        data-lines-per-block={linesPerBlock}
-        data-coordinate-block-count={coordinateBlockCount}
-      >
-        <span
-          ref={measuringGlyphRef}
-          aria-hidden="true"
-          className="nsv:absolute nsv:invisible nsv:w-max nsv:font-mono"
+      <>
+        <SequenceKeyboardHelp
+          instructionsId={instructionsId}
+          statusId={statusId}
+          selectionStatus={selectionStatus}
+        />
+        <div
+          ref={virtualRootRef}
+          role="listbox"
+          tabIndex={0}
+          aria-label={`Sequence residues, ${annotatedSequences.length} sequences by ${maxSequenceLength} positions`}
+          aria-multiselectable="true"
+          aria-activedescendant={keyboard.activeDescendantId}
+          aria-describedby={`${instructionsId} ${statusId}`}
+          onKeyDown={keyboard.onKeyDown}
+          onCopy={(event) => {
+            if (!selection) return;
+            const text = getStringToCopy(
+              annotatedSequences,
+              selection,
+              copySequenceIdx,
+            );
+            if (!text) return;
+            event.clipboardData.setData("text/plain", text);
+            event.preventDefault();
+          }}
+          className="nsv:relative nsv:w-full nsv:focus-visible:outline-2 nsv:focus-visible:outline-offset-2"
+          style={{
+            height: virtualizer.getTotalSize(),
+            overflowAnchor: "none",
+          }}
+          data-virtualized="true"
+          data-columns-per-row={columnsPerRow}
+          data-lines-per-block={linesPerBlock}
+          data-coordinate-block-count={coordinateBlockCount}
         >
-          M
-        </span>
-        {virtualItems.map((virtualItem) => {
-          const blockIndex = Math.floor(virtualItem.index / linesPerBlock);
-          const lineInBlock = virtualItem.index % linesPerBlock;
-          const first = blockIndex * columnsPerRow;
-          const last = Math.min(maxSequenceLength, first + columnsPerRow);
-          const isSequenceLine = lineInBlock < annotatedSequences.length;
-          const sequenceIdx = lineInBlock;
-          const annotationStack = lineInBlock - annotatedSequences.length;
-          return (
-            <div
-              key={virtualItem.key}
-              className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
-              style={{
-                top: 0,
-                height: virtualItem.size,
-                paddingTop: isSequenceLine && sequenceIdx === 0 ? 16 : 0,
-                transform: `translateY(${virtualItem.start - scrollMargin}px)`,
-              }}
-              data-index={virtualItem.index}
-              data-virtual-row={blockIndex}
-              data-virtual-line={virtualItem.index}
-              data-line-kind={isSequenceLine ? "sequence" : "annotation"}
-              data-sequence-index={isSequenceLine ? sequenceIdx : undefined}
-            >
-              {Array.from({ length: last - first }, (_, offset) => {
-                const baseIdx = first + offset;
-                if (!isSequenceLine) {
-                  return (
-                    <SequenceAnnotationLine
-                      key={`annotation-${annotationStack}-${baseIdx}`}
-                      annotations={orderedAnnotations}
-                      index={baseIdx}
-                      stack={annotationStack}
-                      setHoveredPosition={setHoveredPosition}
-                      setActiveAnnotation={setActiveAnnotation}
-                      maxSequenceLength={maxSequenceLength}
-                      width={virtualMetrics.columnWidth}
-                    />
+          <span
+            ref={measuringGlyphRef}
+            aria-hidden="true"
+            className="nsv:absolute nsv:invisible nsv:w-max nsv:font-mono"
+          >
+            M
+          </span>
+          {virtualItems.map((virtualItem) => {
+            const blockIndex = Math.floor(virtualItem.index / linesPerBlock);
+            const lineInBlock = virtualItem.index % linesPerBlock;
+            const first = blockIndex * columnsPerRow;
+            const last = Math.min(maxSequenceLength, first + columnsPerRow);
+            const isSequenceLine = lineInBlock < annotatedSequences.length;
+            const sequenceIdx = lineInBlock;
+            const annotationStack = lineInBlock - annotatedSequences.length;
+            return (
+              <div
+                role="presentation"
+                key={virtualItem.key}
+                className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
+                style={{
+                  top: 0,
+                  height: virtualItem.size,
+                  paddingTop: isSequenceLine && sequenceIdx === 0 ? 16 : 0,
+                  transform: `translateY(${virtualItem.start - scrollMargin}px)`,
+                }}
+                data-index={virtualItem.index}
+                data-virtual-row={blockIndex}
+                data-virtual-line={virtualItem.index}
+                data-line-kind={isSequenceLine ? "sequence" : "annotation"}
+                data-sequence-index={isSequenceLine ? sequenceIdx : undefined}
+              >
+                {Array.from({ length: last - first }, (_, offset) => {
+                  const baseIdx = first + offset;
+                  if (!isSequenceLine) {
+                    return (
+                      <SequenceAnnotationLine
+                        key={`annotation-${annotationStack}-${baseIdx}`}
+                        annotations={orderedAnnotations}
+                        index={baseIdx}
+                        stack={annotationStack}
+                        setHoveredPosition={setHoveredPosition}
+                        setActiveAnnotation={setActiveAnnotation}
+                        maxSequenceLength={maxSequenceLength}
+                        width={virtualMetrics.columnWidth}
+                      />
+                    );
+                  }
+                  return renderResidue(
+                    baseIdx,
+                    sequenceIdx,
+                    virtualMetrics.columnWidth,
                   );
-                }
-                return renderResidue(
-                  baseIdx,
-                  sequenceIdx,
-                  virtualMetrics.columnWidth,
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </>
     );
   }
 
   return (
     <>
-      {Array.from({ length: maxSequenceLength }, (_, baseIdx) =>
-        renderSmallColumn(baseIdx),
-      )}
+      <SequenceKeyboardHelp
+        instructionsId={instructionsId}
+        statusId={statusId}
+        selectionStatus={selectionStatus}
+      />
+      <div
+        role="listbox"
+        tabIndex={0}
+        aria-label={`Sequence residues, ${annotatedSequences.length} sequences by ${maxSequenceLength} positions`}
+        aria-multiselectable="true"
+        aria-activedescendant={keyboard.activeDescendantId}
+        aria-describedby={`${instructionsId} ${statusId}`}
+        onKeyDown={keyboard.onKeyDown}
+        onCopy={(event) => {
+          if (!selection) return;
+          const text = getStringToCopy(
+            annotatedSequences,
+            selection,
+            copySequenceIdx,
+          );
+          if (!text) return;
+          event.clipboardData.setData("text/plain", text);
+          event.preventDefault();
+        }}
+        className="nsv:relative nsv:flex nsv:w-full nsv:flex-wrap nsv:focus-visible:outline-2 nsv:focus-visible:outline-offset-2"
+      >
+        {Array.from({ length: maxSequenceLength }, (_, baseIdx) =>
+          renderSmallColumn(baseIdx),
+        )}
+      </div>
     </>
   );
 };
+
+const SequenceKeyboardHelp = ({
+  instructionsId,
+  statusId,
+  selectionStatus,
+}: {
+  instructionsId: string;
+  statusId: string;
+  selectionStatus: string;
+}) => (
+  <>
+    <span id={instructionsId} className="nsv:sr-only">
+      Use arrow keys to move by residue or sequence. Hold Shift with an arrow
+      key to extend selection. Press Space or Enter to select the active
+      residue. Press A repeatedly to inspect annotations at the active position,
+      then Shift+A to activate the described annotation. Press Escape to clear
+      selection.
+    </span>
+    <span
+      id={statusId}
+      className="nsv:sr-only"
+      role="status"
+      aria-live="polite"
+    >
+      {selectionStatus}
+    </span>
+  </>
+);
 
 const SequenceAnnotationLine = ({
   annotations,

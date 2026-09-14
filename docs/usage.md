@@ -63,6 +63,27 @@ Coordinates are zero-based and both endpoints are included. A start greater
 than end crosses the origin. Keep complete strings and coordinate conventions
 consistent when linking the linear, circular, and residue viewers.
 
+### Keyboard selection
+
+Tab once to enter the residue list. The viewer keeps DOM focus on that list and
+announces the active residue without adding a tab stop for every residue.
+
+- Left and Right move between zero-based positions. Up and Down move between
+  sequence rows and skip empty rows. Home and End move to the first and last
+  residue in the current row.
+- Shift with a movement key selects from the position where that keyboard range
+  began. The selection endpoints stay in ascending order; `direction` is
+  `reverse` when focus moved toward a lower coordinate.
+- Space or Enter selects only the active residue. Escape clears selection.
+- A cycles through every annotation at the active coordinate and announces its
+  label, type, direction, and range. Shift+A invokes the currently described
+  annotation's `onClick`, when supplied.
+
+Keyboard changes use the same controlled or internal selection path as pointer
+changes. Copy while the residue list has focus uses the sequence chosen in the
+metadata bar. Text inputs and other viewer instances keep their native copy
+behavior.
+
 ## Annotations and styling
 
 Annotations are optional. A click callback receives the annotation, including `{ start, end, direction }`.

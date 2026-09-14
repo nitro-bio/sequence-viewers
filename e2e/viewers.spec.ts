@@ -1,5 +1,67 @@
 import { expect, test } from "@playwright/test";
 
+test("packed viewer supports scoped keyboard focus, selection, copying, and annotations", async ({
+  page,
+  context,
+}, testInfo) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/");
+  await page.addStyleTag({ url: "/library.css" });
+  await page.locator("body").click({ position: { x: 1, y: 1 } });
+
+  const surface = page
+    .getByTestId("sequence-viewer")
+    .getByRole("listbox", { name: /Sequence residues/ });
+  for (let attempts = 0; attempts < 20; attempts += 1) {
+    await page.keyboard.press("Tab");
+    if (await surface.evaluate((node) => node === document.activeElement))
+      break;
+  }
+  await expect(surface).toBeFocused();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect(page.getByTestId("selection-output")).toContainText(
+    '"direction":"reverse"',
+  );
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("a");
+  await expect(
+    page
+      .getByTestId("sequence-viewer")
+      .getByRole("status")
+      .filter({ hasText: "CDS annotation, Example feature" }),
+  ).toBeVisible();
+
+  const hostInput = page.getByTestId("host-input");
+  await hostInput.focus();
+  await hostInput.selectText();
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("Host input");
+
+  const secondary = page
+    .getByTestId("secondary-sequence-viewer")
+    .getByRole("listbox");
+  await secondary.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("T");
+
+  await surface.focus();
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("GT");
+  await page.screenshot({
+    path: testInfo.outputPath("keyboard-selection.png"),
+  });
+});
+
 test("React 19: select, copy, edit, and empty the packed viewers", async ({
   page,
   context,
@@ -139,6 +201,16 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(
     virtualRoot.locator(".nsv-sequence-selection").first(),
   ).toBeVisible();
+  const deepResidue = virtualRoot.locator(
+    '[data-sequence-row="0"][data-sequence-position="15000"]',
+  );
+  const scrollTopBeforeResidueClick = await scrollContainer.evaluate(
+    (node) => node.scrollTop,
+  );
+  await deepResidue.click();
+  await expect
+    .poll(() => scrollContainer.evaluate((node) => node.scrollTop))
+    .toBe(scrollTopBeforeResidueClick);
   const [firstRowBox, secondRowBox] = await virtualRoot.evaluate((root) =>
     Array.from(root.querySelectorAll('[data-line-kind="sequence"]'), (row) => {
       const rect = row.getBoundingClientRect();
@@ -188,10 +260,11 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect
     .poll(() =>
       manyRowRoot.evaluate((root) =>
-        Number(
-          root
-            .querySelector('[data-line-kind="sequence"]')
-            ?.getAttribute("data-sequence-index"),
+        Math.max(
+          ...Array.from(
+            root.querySelectorAll('[data-line-kind="sequence"]'),
+            (line) => Number(line.getAttribute("data-sequence-index")),
+          ),
         ),
       ),
     )

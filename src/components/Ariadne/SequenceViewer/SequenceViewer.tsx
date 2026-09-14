@@ -755,7 +755,7 @@ export const SeqContent = ({
               className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
               style={{
                 top: rowTop,
-                minHeight: virtualMetrics.rowHeight,
+                height: virtualMetrics.rowHeight,
               }}
               data-virtual-row={rowIndex}
             >
@@ -764,7 +764,7 @@ export const SeqContent = ({
                   first + index,
                   {
                     flex: `0 0 ${virtualMetrics.columnWidth}px`,
-                    height: virtualMetrics.rowHeight,
+                    height: virtualMetrics.rowHeight - 16,
                   },
                   sequenceStart,
                   Math.max(sequenceStart + 1, sequenceEnd),

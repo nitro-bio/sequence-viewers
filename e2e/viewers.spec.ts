@@ -100,16 +100,26 @@ test("malformed annotations recover locally, with strict errors handled by the h
 
 test("large packed sequences window scrolling while preserving logical selection", async ({
   page,
-}, testInfo) => {
+  context,
+}) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/?virtual=1");
   await page.addStyleTag({ url: "/library.css" });
   const viewer = page.getByTestId("virtual-sequence-viewer");
   const virtualRoot = viewer.locator('[data-virtualized="true"]').first();
   const scrollContainer = page.getByTestId("virtual-scroll-container");
+  await viewer.getByRole("button", { name: "Reveal viewer" }).click();
   await scrollContainer.scrollIntoViewIfNeeded();
   await expect(virtualRoot).toBeVisible();
+  await viewer.getByRole("button", { name: "Constrain viewer" }).click();
+  await expect
+    .poll(() => scrollContainer.evaluate((node) => node.clientHeight))
+    .toBe(360);
+  expect(
+    await scrollContainer.evaluate((node) => node.scrollHeight),
+  ).toBeGreaterThan(360);
   const totalPositions = await virtualRoot
     .locator("[data-sequence-position]")
     .count();
@@ -121,6 +131,10 @@ test("large packed sequences window scrolling while preserving logical selection
     '"start":15000',
   );
   await expect(virtualRoot.locator(".nsv-sequence-selection")).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Copy to clipboard" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("ACGTACGTACG");
 
   await virtualRoot.evaluate((root) => {
     const columns = Number((root as HTMLElement).dataset.columnsPerRow);
@@ -154,6 +168,22 @@ test("large packed sequences window scrolling while preserving logical selection
   await visibleAnnotation.click();
   await expect(page.getByTestId("virtual-annotation-clicks")).toHaveText("1");
 
+  const firstSelectedResidue = virtualRoot.locator(
+    '[data-sequence-row="0"][data-sequence-position="15000"]',
+  );
+  await firstSelectedResidue.hover();
+  await page.mouse.down();
+  await virtualRoot
+    .locator('[data-sequence-row="0"][data-sequence-position="15002"]')
+    .hover();
+  await page.mouse.up();
+  await expect(page.getByTestId("virtual-selection")).toContainText(
+    '"end":15002',
+  );
+
+  const columnsBeforeResize = await virtualRoot.evaluate((root) =>
+    Number((root as HTMLElement).dataset.columnsPerRow),
+  );
   const positionBeforeResize = await virtualRoot.evaluate((root) =>
     Number(
       root
@@ -163,8 +193,16 @@ test("large packed sequences window scrolling while preserving logical selection
   );
   await viewer.getByRole("button", { name: "Resize viewer" }).click();
   await expect
-    .poll(() => scrollContainer.evaluate((node) => node.clientWidth))
-    .toBe(520);
+    .poll(() =>
+      virtualRoot.evaluate((root) =>
+        Number((root as HTMLElement).dataset.columnsPerRow),
+      ),
+    )
+    .toBeLessThan(columnsBeforeResize);
+  await expect(firstSelectedResidue).toBeVisible();
+  const columnsAfterResize = await virtualRoot.evaluate((root) =>
+    Number((root as HTMLElement).dataset.columnsPerRow),
+  );
   const positionAfterResize = await virtualRoot.evaluate((root) =>
     Number(
       root
@@ -172,9 +210,24 @@ test("large packed sequences window scrolling while preserving logical selection
         ?.getAttribute("data-sequence-position"),
     ),
   );
-  expect(Math.abs(positionAfterResize - positionBeforeResize)).toBeLessThan(
-    500,
+  expect(
+    Math.abs(positionAfterResize - positionBeforeResize),
+  ).toBeLessThanOrEqual(Math.max(columnsBeforeResize, columnsAfterResize) * 2);
+
+  const heightBeforeLineChange = await virtualRoot.evaluate(
+    (root) => (root as HTMLElement).offsetHeight,
   );
+  await viewer.getByRole("button", { name: "Increase row height" }).click();
+  await expect
+    .poll(() =>
+      virtualRoot.evaluate((root) => (root as HTMLElement).offsetHeight),
+    )
+    .toBeGreaterThan(heightBeforeLineChange * 1.3);
+  expect(
+    await virtualRoot.evaluate((root) =>
+      Number((root as HTMLElement).dataset.columnsPerRow),
+    ),
+  ).toBe(columnsAfterResize);
 
   const manyRowScroller = page.getByTestId("many-row-scroll-container");
   const manyRowRoot = manyRowScroller.locator('[data-virtualized="true"]');
@@ -196,7 +249,9 @@ test("large packed sequences window scrolling while preserving logical selection
       ),
     )
     .toBeGreaterThan(1_000);
-  await page.screenshot({ path: testInfo.outputPath("virtualized.png") });
+  const sentinelRow = manyRowRoot.locator('[data-sequence-row="5000"]');
+  await expect(sentinelRow).toHaveCount(8);
+  await expect(sentinelRow).toHaveText(Array(8).fill("T"));
   await scrollContainer.evaluate((node) => {
     node.scrollTop = 0;
   });
@@ -212,6 +267,9 @@ test("React 19 windows a large viewer against page scrolling", async ({
   await expect(page.locator("html")).toHaveAttribute("data-react", /^19\./);
   const viewer = page.getByTestId("window-virtual-sequence-viewer");
   const virtualRoot = viewer.locator('[data-virtualized="true"]');
+  await virtualRoot.evaluate((root) =>
+    window.scrollTo(0, root.getBoundingClientRect().top + window.scrollY),
+  );
   await expect(virtualRoot).toBeVisible();
   const initialCount = await virtualRoot
     .locator('[data-line-kind="sequence"] [data-sequence-position]')
@@ -251,4 +309,26 @@ test("React 19 windows a large viewer against page scrolling", async ({
       .locator('[data-line-kind="sequence"] [data-sequence-position]')
       .count(),
   ).toBeLessThan(2_000);
+
+  const columnsBeforeResize = await virtualRoot.evaluate((root) =>
+    Number((root as HTMLElement).dataset.columnsPerRow),
+  );
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(virtualRoot).not.toBeInViewport();
+  await page.getByTestId("resize-window-viewer").click();
+  await expect
+    .poll(() =>
+      virtualRoot.evaluate((root) =>
+        Number((root as HTMLElement).dataset.columnsPerRow),
+      ),
+    )
+    .toBeLessThan(columnsBeforeResize);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

@@ -141,11 +141,14 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(
     virtualRoot.locator(".nsv-sequence-selection").first(),
   ).toBeVisible();
-  const virtualRows = virtualRoot.locator("[data-virtual-row]");
-  const firstRowBox = await virtualRows.nth(0).boundingBox();
-  const secondRowBox = await virtualRows.nth(1).boundingBox();
-  expect(firstRowBox!.y + firstRowBox!.height).toBeLessThanOrEqual(
-    secondRowBox!.y,
+  const [firstRowBox, secondRowBox] = await virtualRoot.evaluate((root) =>
+    Array.from(root.querySelectorAll("[data-virtual-row]"), (row) => {
+      const rect = row.getBoundingClientRect();
+      return { y: rect.y, height: rect.height };
+    }).slice(0, 2),
+  );
+  expect(firstRowBox.y + firstRowBox.height).toBeLessThanOrEqual(
+    secondRowBox.y,
   );
   await virtualRoot.locator(".caller-annotation").first().hover();
   await expect(viewer.getByText("Virtual feature")).toBeVisible();

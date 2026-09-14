@@ -78,8 +78,18 @@ export const getAnnotatedSequence = ({
   // residue. The active list stays in caller order, matching Array#filter.
   const starts = new Map<number, number[]>();
   const stops = new Map<number, number[]>();
-  const addEvent = (events: Map<number, number[]>, at: number, index: number) =>
-    events.set(at, [...(events.get(at) ?? []), index]);
+  const addEvent = (
+    events: Map<number, number[]>,
+    at: number,
+    index: number,
+  ) => {
+    const existing = events.get(at);
+    if (existing) {
+      existing.push(index);
+    } else {
+      events.set(at, [index]);
+    }
+  };
   const addInterval = (start: number, end: number, annotationIndex: number) => {
     const first = Math.max(0, Math.ceil(start));
     const last = Math.min(sequence.length - 1, Math.floor(end));

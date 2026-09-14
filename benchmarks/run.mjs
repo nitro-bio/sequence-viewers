@@ -44,8 +44,14 @@ const server = await preview({
   preview: { host: "127.0.0.1", port: 4181, strictPort: true },
 });
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const git = (args) =>
+  execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const report = {
   version: pkg.version,
+  source: {
+    commit: git(["rev-parse", "HEAD"]),
+    dirty: Boolean(git(["status", "--porcelain"])),
+  },
   date: new Date().toISOString(),
   environment: {
     os: `${platform()} ${release()}`,

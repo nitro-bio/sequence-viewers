@@ -150,8 +150,13 @@ test("large packed sequences window scrolling while preserving logical selection
   expect(firstRowBox.y + firstRowBox.height).toBeLessThanOrEqual(
     secondRowBox.y,
   );
-  await virtualRoot.locator(".caller-annotation").first().hover();
+  await virtualRoot.evaluate((root) => {
+    const annotation = root.querySelector(".caller-annotation");
+    annotation?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    annotation?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
   await expect(viewer.getByText("Virtual feature")).toBeVisible();
+  await expect(page.getByTestId("virtual-annotation-clicks")).toHaveText("1");
 
   const positionBeforeResize = Number(
     await virtualRoot

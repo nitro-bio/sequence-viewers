@@ -205,6 +205,7 @@ function VirtualSequenceFixture() {
     direction: "forward",
   });
   const [narrow, setNarrow] = useState(false);
+  const [annotationClicks, setAnnotationClicks] = useState(0);
   const sequence = "ACGT".repeat(5_000);
   return (
     <section data-testid="virtual-sequence-viewer">
@@ -234,6 +235,7 @@ function VirtualSequenceFixture() {
               start: 15_000,
               end: 15_010,
               text: "Virtual feature",
+              onClick: () => setAnnotationClicks((count) => count + 1),
             },
           ]}
           selection={selection}
@@ -243,6 +245,9 @@ function VirtualSequenceFixture() {
       </div>
       <output data-testid="virtual-selection">
         {JSON.stringify(selection)}
+      </output>
+      <output data-testid="virtual-annotation-clicks">
+        {annotationClicks}
       </output>
       <div
         data-testid="many-row-scroll-container"

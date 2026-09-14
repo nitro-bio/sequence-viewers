@@ -642,21 +642,17 @@ export const SeqContent = ({
       key={`base-${baseIdx}`}
       data-sequence-position={baseIdx}
     >
-      <div style={{ display: "contents" }}>
-        {annotatedSequences.map((_, sequenceIdx) =>
-          renderResidue(baseIdx, sequenceIdx),
-        )}
-      </div>
-      <div style={{ display: "contents" }}>
-        <SequenceAnnotation
-          annotations={orderedAnnotations}
-          index={baseIdx}
-          maxAnnotationStack={maxAnnotationStack + 1}
-          setHoveredPosition={setHoveredPosition}
-          setActiveAnnotation={setActiveAnnotation}
-          maxSequenceLength={maxSequenceLength}
-        />
-      </div>
+      {annotatedSequences.map((_, sequenceIdx) =>
+        renderResidue(baseIdx, sequenceIdx),
+      )}
+      <SequenceAnnotation
+        annotations={orderedAnnotations}
+        index={baseIdx}
+        maxAnnotationStack={maxAnnotationStack + 1}
+        setHoveredPosition={setHoveredPosition}
+        setActiveAnnotation={setActiveAnnotation}
+        maxSequenceLength={maxSequenceLength}
+      />
     </div>
   );
 

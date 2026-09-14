@@ -685,6 +685,8 @@ export const SeqContent = ({
             useVirtualRows
               ? {
                   position: "absolute",
+                  left: 0,
+                  right: 0,
                   top: annotatedSequences.length * virtualMetrics.residueHeight,
                 }
               : { display: "contents" }

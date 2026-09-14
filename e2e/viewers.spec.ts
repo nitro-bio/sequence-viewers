@@ -150,29 +150,29 @@ test("large packed sequences window scrolling while preserving logical selection
   expect(firstRowBox.y + firstRowBox.height).toBeLessThanOrEqual(
     secondRowBox.y,
   );
-  await virtualRoot.evaluate((root) => {
-    const annotation = root.querySelector(".caller-annotation");
-    annotation?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    annotation?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  });
+  const visibleAnnotation = virtualRoot.locator(".caller-annotation").first();
+  await visibleAnnotation.hover();
+  await visibleAnnotation.click();
   await expect(viewer.getByText("Virtual feature")).toBeVisible();
   await expect(page.getByTestId("virtual-annotation-clicks")).toHaveText("1");
 
-  const positionBeforeResize = Number(
-    await virtualRoot
-      .locator("[data-sequence-position]")
-      .first()
-      .getAttribute("data-sequence-position"),
+  const positionBeforeResize = await virtualRoot.evaluate((root) =>
+    Number(
+      root
+        .querySelector("[data-sequence-position]")
+        ?.getAttribute("data-sequence-position"),
+    ),
   );
   await viewer.getByRole("button", { name: "Resize viewer" }).click();
   await expect
     .poll(() => scrollContainer.evaluate((node) => node.clientWidth))
     .toBe(520);
-  const positionAfterResize = Number(
-    await virtualRoot
-      .locator("[data-sequence-position]")
-      .first()
-      .getAttribute("data-sequence-position"),
+  const positionAfterResize = await virtualRoot.evaluate((root) =>
+    Number(
+      root
+        .querySelector("[data-sequence-position]")
+        ?.getAttribute("data-sequence-position"),
+    ),
   );
   expect(Math.abs(positionAfterResize - positionBeforeResize)).toBeLessThan(
     500,
@@ -188,12 +188,13 @@ test("large packed sequences window scrolling while preserving logical selection
     node.scrollTop = node.scrollHeight / 2;
   });
   await expect
-    .poll(async () =>
-      Number(
-        await manyRowRoot
-          .locator("[data-sequence-row]")
-          .first()
-          .getAttribute("data-sequence-row"),
+    .poll(() =>
+      manyRowRoot.evaluate((root) =>
+        Number(
+          root
+            .querySelector("[data-sequence-row]")
+            ?.getAttribute("data-sequence-row"),
+        ),
       ),
     )
     .toBeGreaterThan(1_000);

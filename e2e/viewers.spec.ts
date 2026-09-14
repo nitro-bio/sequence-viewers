@@ -135,9 +135,11 @@ test("malformed annotations recover locally, with strict errors handled by the h
   await page.getByLabel("Invalid annotations").check();
   for (const name of ["sequence", "linear", "circular"]) {
     const viewer = page.getByTestId(`${name}-viewer`);
-    await expect(viewer.getByRole("status")).toContainText(
-      "Some annotations were not displayed",
-    );
+    await expect(
+      viewer
+        .getByRole("status")
+        .filter({ hasText: "Some annotations were not displayed" }),
+    ).toBeVisible();
     await expect(viewer.locator(".caller-annotation").first()).toBeVisible();
     await expect(viewer).not.toContainText("Invalid feature");
   }
@@ -145,7 +147,10 @@ test("malformed annotations recover locally, with strict errors handled by the h
     page.getByTestId("sequence-viewer").locator(".caller-char").first(),
   ).toBeVisible();
   const circular = page.getByTestId("circular-viewer");
-  const diagnostic = await circular.getByRole("status").boundingBox();
+  const diagnostic = await circular
+    .getByRole("status")
+    .filter({ hasText: "Some annotations were not displayed" })
+    .boundingBox();
   const diagram = await circular.locator("svg").first().boundingBox();
   expect(diagram!.y).toBeGreaterThanOrEqual(diagnostic!.y + diagnostic!.height);
 
@@ -292,10 +297,13 @@ test("React 19 windows a large viewer against page scrolling", async ({
   expect(initialCount).toBeGreaterThan(0);
   expect(initialCount).toBeLessThan(2_000);
   const initialPosition = await virtualRoot.evaluate((root) =>
-    Number(
-      root
-        .querySelector('[data-line-kind="sequence"] [data-sequence-position]')
-        ?.getAttribute("data-sequence-position"),
+    Math.max(
+      ...Array.from(
+        root.querySelectorAll(
+          '[data-line-kind="sequence"] [data-sequence-position]',
+        ),
+        (residue) => Number(residue.getAttribute("data-sequence-position")),
+      ),
     ),
   );
   await virtualRoot.evaluate((root) => {
@@ -309,12 +317,13 @@ test("React 19 windows a large viewer against page scrolling", async ({
   await expect
     .poll(() =>
       virtualRoot.evaluate((root) =>
-        Number(
-          root
-            .querySelector(
+        Math.max(
+          ...Array.from(
+            root.querySelectorAll(
               '[data-line-kind="sequence"] [data-sequence-position]',
-            )
-            ?.getAttribute("data-sequence-position"),
+            ),
+            (residue) => Number(residue.getAttribute("data-sequence-position")),
+          ),
         ),
       ),
     )

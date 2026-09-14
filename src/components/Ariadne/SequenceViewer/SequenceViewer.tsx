@@ -315,7 +315,7 @@ export const SequenceViewer = ({
           alignState={alignState}
         />
       )}
-      <div className="nsv:flex nsv:flex-wrap nsv:px-2">
+      <div className="nsv:flex nsv:w-full nsv:flex-wrap nsv:px-2">
         {memoizedSeqContent}
       </div>
     </div>
@@ -352,7 +352,13 @@ export const SeqContent = ({
   const VIRTUAL_OVERSCAN_ROWS = 3;
   const mouseDown = useRef(false);
   const virtualRootRef = useRef<HTMLDivElement>(null);
-  const measuringRowRef = useRef<HTMLDivElement>(null);
+  const measuringGlyphRef = useRef<HTMLSpanElement>(null);
+  const measuredContainerWidthRef = useRef(0);
+  const visibleTopRef = useRef(0);
+  const resizeAnchorRef = useRef<{
+    position: number;
+    withinRow: number;
+  } | null>(null);
   const [virtualMetrics, setVirtualMetrics] = useState({
     columnWidth: 10,
     rowHeight: 52,
@@ -451,41 +457,49 @@ export const SeqContent = ({
       }
       ancestor = ancestor.parentElement;
     }
-    const top = Math.max(0, clipTop - rect.top);
-    const bottom = Math.max(0, Math.min(rect.height, clipBottom - rect.top));
+    const top = Math.min(rect.height, Math.max(0, clipTop - rect.top));
+    const bottom = Math.max(
+      top,
+      Math.min(rect.height, Math.max(0, clipBottom - rect.top)),
+    );
+    visibleTopRef.current = top;
     const firstVisible = Math.floor(top / virtualMetrics.rowHeight);
     const lastVisible = Math.ceil(bottom / virtualMetrics.rowHeight);
-    setVisiblePixels({ top, bottom });
-    setVisibleRows({
-      start: Math.max(0, firstVisible - VIRTUAL_OVERSCAN_ROWS),
+    setVisiblePixels((current) =>
+      current.top === top && current.bottom === bottom
+        ? current
+        : { top, bottom },
+    );
+    const nextRows = {
+      start: Math.min(
+        virtualRowCount,
+        Math.max(0, firstVisible - VIRTUAL_OVERSCAN_ROWS),
+      ),
       end: Math.min(
         virtualRowCount,
         Math.max(firstVisible + 1, lastVisible) + VIRTUAL_OVERSCAN_ROWS,
       ),
-    });
+    };
+    setVisibleRows((current) =>
+      current.start === nextRows.start && current.end === nextRows.end
+        ? current
+        : nextRows,
+    );
   }, [virtualMetrics.rowHeight, virtualRowCount]);
 
   useEffect(() => {
     if (!useVirtualRows) return;
     const root = virtualRootRef.current;
-    const measuringRow = measuringRowRef.current;
-    if (!root || !measuringRow) return;
+    const measuringGlyph = measuringGlyphRef.current;
+    if (!root || !measuringGlyph) return;
 
     const measure = () => {
-      const firstColumn = measuringRow.firstElementChild as HTMLElement | null;
-      const firstResidue = firstColumn?.querySelector(
-        "[data-sequence-row]",
-      ) as HTMLElement | null;
-      const residueGlyph = firstResidue?.lastElementChild as HTMLElement | null;
-      const residueHeight = Math.max(
-        1,
-        firstResidue?.getBoundingClientRect().height ?? 24,
-      );
+      const glyphRect = measuringGlyph.getBoundingClientRect();
+      const residueHeight = Math.max(1, glyphRect.height || 24);
+      const hasMeasured = measuredContainerWidthRef.current > 0;
+      measuredContainerWidthRef.current = root.clientWidth;
       const next = {
-        columnWidth: Math.max(
-          1,
-          residueGlyph?.getBoundingClientRect().width ?? 10,
-        ),
+        columnWidth: Math.max(1, (glyphRect.width || 9) + 1),
         rowHeight:
           16 +
           annotatedSequences.length * residueHeight +
@@ -493,17 +507,31 @@ export const SeqContent = ({
         containerWidth: Math.max(1, root.clientWidth),
         residueHeight,
       };
-      setVirtualMetrics((current) =>
-        current.columnWidth === next.columnWidth &&
-        current.rowHeight === next.rowHeight &&
-        current.containerWidth === next.containerWidth &&
-        current.residueHeight === next.residueHeight
+      setVirtualMetrics((current) => {
+        if (current.containerWidth !== next.containerWidth && hasMeasured) {
+          const previousColumns = Math.max(
+            1,
+            Math.floor(current.containerWidth / current.columnWidth),
+          );
+          resizeAnchorRef.current = {
+            position:
+              Math.floor(visibleTopRef.current / current.rowHeight) *
+              previousColumns,
+            withinRow: visibleTopRef.current % current.rowHeight,
+          };
+        }
+        return current.columnWidth === next.columnWidth &&
+          current.rowHeight === next.rowHeight &&
+          current.containerWidth === next.containerWidth &&
+          current.residueHeight === next.residueHeight
           ? current
-          : next,
-      );
+          : next;
+      });
     };
     measure();
-    const resizeObserver = new ResizeObserver(measure);
+    const resizeObserver = new ResizeObserver(() => {
+      if (root.clientWidth !== measuredContainerWidthRef.current) measure();
+    });
     resizeObserver.observe(root);
     window.addEventListener("scroll", updateVisibleRows, true);
     window.addEventListener("resize", updateVisibleRows);
@@ -523,6 +551,38 @@ export const SeqContent = ({
     if (useVirtualRows) updateVisibleRows();
   }, [columnsPerRow, updateVisibleRows, useVirtualRows]);
 
+  useEffect(() => {
+    const anchor = resizeAnchorRef.current;
+    const root = virtualRootRef.current;
+    if (!useVirtualRows || !anchor || !root) return;
+    resizeAnchorRef.current = null;
+    const targetTop =
+      Math.floor(anchor.position / columnsPerRow) * virtualMetrics.rowHeight +
+      anchor.withinRow;
+    const delta = targetTop - visibleTopRef.current;
+    let ancestor = root.parentElement;
+    while (ancestor) {
+      if (["auto", "scroll"].includes(getComputedStyle(ancestor).overflowY)) {
+        ancestor.scrollTop += delta;
+        return;
+      }
+      ancestor = ancestor.parentElement;
+    }
+    window.scrollBy({ top: delta });
+  }, [columnsPerRow, useVirtualRows, virtualMetrics.rowHeight]);
+
+  useEffect(() => {
+    if (!useVirtualRows) return;
+    setHoveredPosition(null);
+    setActiveAnnotation(null);
+  }, [
+    setActiveAnnotation,
+    setHoveredPosition,
+    useVirtualRows,
+    visibleRows.end,
+    visibleRows.start,
+  ]);
+
   const renderColumn = (
     baseIdx: number,
     style?: CSSProperties,
@@ -541,7 +601,7 @@ export const SeqContent = ({
           useVirtualRows
             ? {
                 position: "absolute",
-                top: 16 + sequenceStart * virtualMetrics.residueHeight,
+                top: sequenceStart * virtualMetrics.residueHeight,
               }
             : { display: "contents" }
         }
@@ -623,9 +683,7 @@ export const SeqContent = ({
             useVirtualRows
               ? {
                   position: "absolute",
-                  top:
-                    16 +
-                    annotatedSequences.length * virtualMetrics.residueHeight,
+                  top: annotatedSequences.length * virtualMetrics.residueHeight,
                 }
               : { display: "contents" }
           }
@@ -655,6 +713,13 @@ export const SeqContent = ({
         style={{ height: virtualRowCount * virtualMetrics.rowHeight }}
         data-virtualized="true"
       >
+        <span
+          ref={measuringGlyphRef}
+          aria-hidden="true"
+          className="nsv:absolute nsv:invisible nsv:w-max nsv:font-mono"
+        >
+          M
+        </span>
         {rows.map((rowIndex) => {
           const first = rowIndex * columnsPerRow;
           const last = Math.min(maxSequenceLength, first + columnsPerRow);
@@ -683,7 +748,6 @@ export const SeqContent = ({
           return (
             <div
               key={`virtual-row-${rowIndex}`}
-              ref={rowIndex === visibleRows.start ? measuringRowRef : undefined}
               className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
               style={{
                 top: rowTop,

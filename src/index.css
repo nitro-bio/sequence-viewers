@@ -25,6 +25,7 @@
     isolation: isolate;
     display: flex;
     flex-wrap: wrap;
+    width: 100%;
   }
 
   :where(.nsv-circular-root) {

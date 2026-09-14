@@ -108,10 +108,12 @@ test("large packed sequences window scrolling while preserving logical selection
   const viewer = page.getByTestId("virtual-sequence-viewer");
   const virtualRoot = viewer.locator('[data-virtualized="true"]').first();
   const scrollContainer = page.getByTestId("virtual-scroll-container");
+  await scrollContainer.scrollIntoViewIfNeeded();
   await expect(virtualRoot).toBeVisible();
   const totalPositions = await virtualRoot
     .locator("[data-sequence-position]")
     .count();
+  expect(totalPositions).toBeGreaterThan(100);
   expect(totalPositions).toBeLessThan(2_000);
 
   await viewer.getByRole("button", { name: "Select offscreen range" }).click();
@@ -139,6 +141,12 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(
     virtualRoot.locator(".nsv-sequence-selection").first(),
   ).toBeVisible();
+  const virtualRows = virtualRoot.locator("[data-virtual-row]");
+  const firstRowBox = await virtualRows.nth(0).boundingBox();
+  const secondRowBox = await virtualRows.nth(1).boundingBox();
+  expect(firstRowBox!.y + firstRowBox!.height).toBeLessThanOrEqual(
+    secondRowBox!.y,
+  );
   await virtualRoot.locator(".caller-annotation").first().hover();
   await expect(viewer.getByText("Virtual feature")).toBeVisible();
 
@@ -182,5 +190,9 @@ test("large packed sequences window scrolling while preserving logical selection
     )
     .toBeGreaterThan(1_000);
   await page.screenshot({ path: testInfo.outputPath("virtualized.png") });
+  await scrollContainer.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await expect(viewer.getByText("Virtual feature")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

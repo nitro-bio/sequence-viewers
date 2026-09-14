@@ -1,0 +1,182 @@
+{
+  "version": "2.1.0",
+  "date": "2026-09-14T00:51:22.622Z",
+  "environment": {
+    "os": "darwin 25.6.0",
+    "cpu": "Apple M4",
+    "logicalCpus": 10,
+    "ramGiB": 16,
+    "node": "v26.7.0",
+    "viewport": "1100x900",
+    "react": "18.3.1",
+    "cpuThrottling": "none",
+    "browser": "140.0.7339.16"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 33.09999990463257,
+      "selectionMs": 28.100000023841858,
+      "selectedCells": 1,
+      "domElements": 6028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 35.89999997615814,
+      "selectionMs": 25.699999928474426,
+      "selectedCells": 1,
+      "domElements": 6028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 35.700000047683716,
+      "selectionMs": 21,
+      "selectedCells": 1,
+      "domElements": 6028,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 237.5,
+      "selectionMs": 75.79999995231628,
+      "selectedCells": 1,
+      "domElements": 60028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 234.29999995231628,
+      "selectionMs": 72.60000002384186,
+      "selectedCells": 1,
+      "domElements": 60028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 230,
+      "selectionMs": 72.89999997615814,
+      "selectedCells": 1,
+      "domElements": 60028,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 162,
+      "selectionMs": 35.09999990463257,
+      "selectedCells": 10,
+      "domElements": 33028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 161.80000007152557,
+      "selectionMs": 34.200000047683716,
+      "selectedCells": 10,
+      "domElements": 33028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 160.39999997615814,
+      "selectionMs": 45.5,
+      "selectedCells": 10,
+      "domElements": 33028,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 1222.8000000715256,
+      "selectionMs": 323,
+      "selectedCells": 100,
+      "domElements": 303028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 1180.6000000238419,
+      "selectionMs": 303.59999990463257,
+      "selectedCells": 100,
+      "domElements": 303028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 1206.4000000953674,
+      "selectionMs": 318.7000000476837,
+      "selectedCells": 100,
+      "domElements": 303028,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 2110.899999976158,
+      "selectionMs": 561.5999999046326,
+      "selectedCells": 1,
+      "domElements": 600028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 2118.2000000476837,
+      "selectionMs": 556.8000000715256,
+      "selectedCells": 1,
+      "domElements": 600028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 2122.100000023842,
+      "selectionMs": 529.3999999761581,
+      "selectedCells": 1,
+      "domElements": 600028,
+      "errors": []
+    }
+  ]
+}

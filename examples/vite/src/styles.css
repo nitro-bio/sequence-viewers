@@ -1,0 +1,51 @@
+:root {
+  color: #16211c;
+  background: #f3f7f4;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+  letter-spacing: -0.05em;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #26724d;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.intro {
+  max-width: 640px;
+  margin: 16px 0 32px;
+  color: #52635a;
+  line-height: 1.6;
+}
+
+.viewer-card {
+  overflow-x: auto;
+  padding: 24px;
+  border: 1px solid #d7e2db;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 18px 50px rgb(28 60 43 / 8%);
+}

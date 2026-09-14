@@ -4,10 +4,10 @@ name: Library Build
 on:
   push:
     branches:
-      - "*"
+      - "**"
   pull_request:
     branches:
-      - "*"
+      - "**"
 
 jobs:
   frontend_compile:
@@ -30,5 +30,5 @@ jobs:
         run: pnpm run build:ci
       - name: Install browser for packed consumer checks
         run: pnpm exec playwright install --with-deps chromium
-      - name: Build and test packed consumers
+      - name: Build and smoke packed consumers and framework examples
         run: pnpm test:packed

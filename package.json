@@ -1,7 +1,7 @@
 {
   "name": "@nitro-bio/sequence-viewers",
   "private": false,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",
@@ -20,7 +20,9 @@
     "changeset": "changeset",
     "test:packed:prepare": "node e2e/packed-package.mjs",
     "test:packed": "pnpm test:alignment:assets && pnpm test:packed:prepare && playwright test --config e2e/playwright.config.ts",
-    "test:alignment:assets": "node e2e/prepare-alignment-assets.mjs"
+    "test:alignment:assets": "node e2e/prepare-alignment-assets.mjs",
+    "benchmark": "node benchmarks/run.mjs",
+    "test:examples:packed": "node scripts/test-packed-examples.mjs"
   },
   "dependencies": {
     "@biowasm/aioli": "^3.2.1",
@@ -80,13 +82,18 @@
   "license": "MIT",
   "peerDependencies": {
     "react": "^18.2.0 || ^19.0.0",
-    "react-dom": "^18.2.0 || ^19.0.0"
+    "react-dom": "^18.2.0 || ^19.0.0",
+    "@types/react": "^18.2.0 || ^19.0.0"
   },
   "files": [
     "dist",
     "docs/issue-80/alignment.md",
     "docs/issue-80/css-isolation.md",
-    "docs/issue-80/validation.md"
+    "docs/issue-80/validation.md",
+    "docs/usage.md",
+    "docs/limits.md",
+    "docs/alignment-self-hosting.md",
+    "scripts/prepare-alignment-assets.mjs"
   ],
   "styles": "./dist/nitro-sequence-viewers.css",
   "module": "./dist/nitro-sequence-viewers.es.js",
@@ -100,10 +107,19 @@
     "./dist/nitro.css": "./dist/nitro-sequence-viewers.css",
     "./styles.css": "./dist/nitro-sequence-viewers.css"
   },
-  "description": "collection of ui components",
+  "description": "React components for DNA, RNA and protein sequence visualization, linear and circular annotations, selection, and optional browser alignment.",
   "keywords": [
-    "ui",
-    "components"
+    "react",
+    "bioinformatics",
+    "sequence-viewer",
+    "dna",
+    "rna",
+    "protein",
+    "plasmid",
+    "sequence-alignment",
+    "mafft",
+    "genbank",
+    "typescript"
   ],
   "author": "Nishant Jha",
   "prettier": {
@@ -114,5 +130,21 @@
   "packageManager": "pnpm@11.9.0",
   "sideEffects": [
     "**/*.css"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitro-bio/sequence-viewers.git"
+  },
+  "homepage": "https://docs.nitro.bio/SequenceViewer",
+  "bugs": {
+    "url": "https://github.com/nitro-bio/sequence-viewers/issues"
+  },
+  "bin": {
+    "nitro-sequence-assets": "./scripts/prepare-alignment-assets.mjs"
+  },
+  "peerDependenciesMeta": {
+    "@types/react": {
+      "optional": true
+    }
+  }
 }

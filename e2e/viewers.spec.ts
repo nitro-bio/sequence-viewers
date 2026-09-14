@@ -97,3 +97,90 @@ test("malformed annotations recover locally, with strict errors handled by the h
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(circular).toContainText("12 bp");
 });
+
+test("large packed sequences window scrolling while preserving logical selection", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/?virtual=1");
+  await page.addStyleTag({ url: "/library.css" });
+  const viewer = page.getByTestId("virtual-sequence-viewer");
+  const virtualRoot = viewer.locator('[data-virtualized="true"]').first();
+  const scrollContainer = page.getByTestId("virtual-scroll-container");
+  await expect(virtualRoot).toBeVisible();
+  const totalPositions = await virtualRoot
+    .locator("[data-sequence-position]")
+    .count();
+  expect(totalPositions).toBeLessThan(2_000);
+
+  await viewer.getByRole("button", { name: "Select offscreen range" }).click();
+  await expect(page.getByTestId("virtual-selection")).toContainText(
+    '"start":15000',
+  );
+  await expect(virtualRoot.locator(".nsv-sequence-selection")).toHaveCount(0);
+
+  await virtualRoot.evaluate((root) => {
+    const firstRow = root.querySelector("[data-virtual-row]");
+    const columns = Math.max(
+      1,
+      firstRow?.querySelectorAll("[data-sequence-position]").length ?? 1,
+    );
+    const rows = Math.ceil(20_000 / columns);
+    const rowHeight = (root as HTMLElement).offsetHeight / rows;
+    const scroller = root.closest(
+      '[data-testid="virtual-scroll-container"]',
+    ) as HTMLElement;
+    scroller.scrollTop = Math.floor(15_000 / columns) * rowHeight;
+  });
+  await expect(
+    virtualRoot.locator('[data-sequence-position="15000"]'),
+  ).toBeVisible();
+  await expect(
+    virtualRoot.locator(".nsv-sequence-selection").first(),
+  ).toBeVisible();
+  await virtualRoot.locator(".caller-annotation").first().hover();
+  await expect(viewer.getByText("Virtual feature")).toBeVisible();
+
+  const positionBeforeResize = Number(
+    await virtualRoot
+      .locator("[data-sequence-position]")
+      .first()
+      .getAttribute("data-sequence-position"),
+  );
+  await viewer.getByRole("button", { name: "Resize viewer" }).click();
+  await expect
+    .poll(() => scrollContainer.evaluate((node) => node.clientWidth))
+    .toBe(520);
+  const positionAfterResize = Number(
+    await virtualRoot
+      .locator("[data-sequence-position]")
+      .first()
+      .getAttribute("data-sequence-position"),
+  );
+  expect(Math.abs(positionAfterResize - positionBeforeResize)).toBeLessThan(
+    500,
+  );
+
+  const manyRowScroller = page.getByTestId("many-row-scroll-container");
+  const manyRowRoot = manyRowScroller.locator('[data-virtualized="true"]');
+  await expect(manyRowRoot).toBeVisible();
+  expect(await manyRowRoot.locator("[data-sequence-row]").count()).toBeLessThan(
+    500,
+  );
+  await manyRowScroller.evaluate((node) => {
+    node.scrollTop = node.scrollHeight / 2;
+  });
+  await expect
+    .poll(async () =>
+      Number(
+        await manyRowRoot
+          .locator("[data-sequence-row]")
+          .first()
+          .getAttribute("data-sequence-row"),
+      ),
+    )
+    .toBeGreaterThan(1_000);
+  await page.screenshot({ path: testInfo.outputPath("virtualized.png") });
+  expect(errors).toEqual([]);
+});

@@ -91,9 +91,12 @@ try {
           await page.locator("#result").textContent(),
         );
         const result = { trial, ...measured, errors };
-        if (measured.selectedCells !== workload.rows)
+        if (
+          measured.selectedCells < 1 ||
+          measured.selectedCells > workload.rows
+        )
           throw new Error(
-            `Expected ${workload.rows} selected cells; saw ${measured.selectedCells}`,
+            `Expected a bounded visible selection between 1 and ${workload.rows} cells; saw ${measured.selectedCells}`,
           );
         report.trials.push(result);
         console.log(JSON.stringify(result));

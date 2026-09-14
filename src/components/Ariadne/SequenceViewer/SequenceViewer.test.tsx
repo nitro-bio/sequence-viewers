@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 import type { AnnotatedBase } from "../types";
 import { SeqContent, SequenceViewer } from "./SequenceViewer";
@@ -203,4 +204,83 @@ test("SeqContent keeps the first base when indices are duplicated", () => {
 
   expect(screen.getByText("A")).not.toBeNull();
   expect(screen.queryByText("T")).toBeNull();
+});
+
+test("virtualizes large wrapped sequences and updates the window on scroll", () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+    unobserve() {}
+  };
+  const sequence = "A".repeat(6_000);
+  const { container } = render(
+    <SequenceViewer sequences={[sequence]} hideMetadataBar />,
+  );
+  const virtualRoot = container.querySelector<HTMLElement>(
+    '[data-virtualized="true"]',
+  )!;
+  Object.defineProperty(virtualRoot, "clientWidth", { value: 800 });
+  let top = 0;
+  vi.spyOn(virtualRoot, "getBoundingClientRect").mockImplementation(
+    () =>
+      ({
+        x: 0,
+        y: top,
+        top,
+        left: 0,
+        right: 800,
+        bottom: top + 4_000,
+        width: 800,
+        height: 4_000,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  );
+
+  act(() => window.dispatchEvent(new Event("scroll")));
+  const initialPositions = Array.from(
+    container.querySelectorAll<HTMLElement>("[data-sequence-position]"),
+    (element) => Number(element.dataset.sequencePosition),
+  );
+  expect(initialPositions.length).toBeLessThan(1_000);
+  expect(initialPositions).toContain(0);
+
+  top = -2_000;
+  act(() => window.dispatchEvent(new Event("scroll")));
+  const scrolledPositions = Array.from(
+    container.querySelectorAll<HTMLElement>("[data-sequence-position]"),
+    (element) => Number(element.dataset.sequencePosition),
+  );
+  expect(scrolledPositions[0]).toBeGreaterThan(0);
+  expect(scrolledPositions).not.toContain(0);
+  globalThis.ResizeObserver = originalResizeObserver;
+});
+
+test("keeps offscreen selection logical until its virtual row is shown", () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+    unobserve() {}
+  };
+  const sequence = "A".repeat(6_000);
+  const { container } = render(
+    <SequenceViewer
+      sequences={[sequence]}
+      selection={{ start: 5_000, end: 5_010, direction: "forward" }}
+      hideMetadataBar
+    />,
+  );
+  expect(container.querySelectorAll(".nsv-sequence-selection")).toHaveLength(0);
+  globalThis.ResizeObserver = originalResizeObserver;
+});
+
+test("server-renders a bounded initial window for large inputs", () => {
+  const html = renderToString(
+    <SequenceViewer sequences={["A".repeat(100_000)]} hideMetadataBar />,
+  );
+  expect(html).toContain('data-virtualized="true"');
+  expect((html.match(/data-sequence-position=/g) ?? []).length).toBeLessThan(
+    1_000,
+  );
 });

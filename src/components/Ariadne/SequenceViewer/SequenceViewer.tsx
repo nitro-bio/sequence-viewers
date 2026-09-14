@@ -18,6 +18,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import type {
   AnnotatedBase,
@@ -347,7 +348,19 @@ export const SeqContent = ({
   selectionClassName?: string;
   highlightMisalignments?: boolean;
 }) => {
+  const VIRTUAL_CELL_THRESHOLD = 5_000;
+  const VIRTUAL_OVERSCAN_ROWS = 3;
   const mouseDown = useRef(false);
+  const virtualRootRef = useRef<HTMLDivElement>(null);
+  const measuringRowRef = useRef<HTMLDivElement>(null);
+  const [virtualMetrics, setVirtualMetrics] = useState({
+    columnWidth: 10,
+    rowHeight: 52,
+    containerWidth: 800,
+    residueHeight: 24,
+  });
+  const [visibleRows, setVisibleRows] = useState({ start: 0, end: 8 });
+  const [visiblePixels, setVisiblePixels] = useState({ top: 0, bottom: 900 });
   const handleMouseUp = useCallback(() => {
     mouseDown.current = false;
   }, []);
@@ -411,109 +424,297 @@ export const SeqContent = ({
     [annotatedSequences],
   );
 
+  const useVirtualRows =
+    maxSequenceLength * Math.max(annotatedSequences.length, 1) >
+    VIRTUAL_CELL_THRESHOLD;
+  const columnsPerRow = Math.max(
+    1,
+    Math.floor(virtualMetrics.containerWidth / virtualMetrics.columnWidth),
+  );
+  const virtualRowCount = Math.ceil(maxSequenceLength / columnsPerRow);
+
+  const updateVisibleRows = useCallback(() => {
+    const root = virtualRootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    const viewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
+    let clipTop = 0;
+    let clipBottom = viewportHeight;
+    let ancestor = root.parentElement;
+    while (ancestor) {
+      const overflow = getComputedStyle(ancestor).overflowY;
+      if (["auto", "scroll", "hidden", "clip"].includes(overflow)) {
+        const ancestorRect = ancestor.getBoundingClientRect();
+        clipTop = Math.max(clipTop, ancestorRect.top);
+        clipBottom = Math.min(clipBottom, ancestorRect.bottom);
+      }
+      ancestor = ancestor.parentElement;
+    }
+    const top = Math.max(0, clipTop - rect.top);
+    const bottom = Math.max(0, Math.min(rect.height, clipBottom - rect.top));
+    const firstVisible = Math.floor(top / virtualMetrics.rowHeight);
+    const lastVisible = Math.ceil(bottom / virtualMetrics.rowHeight);
+    setVisiblePixels({ top, bottom });
+    setVisibleRows({
+      start: Math.max(0, firstVisible - VIRTUAL_OVERSCAN_ROWS),
+      end: Math.min(
+        virtualRowCount,
+        Math.max(firstVisible + 1, lastVisible) + VIRTUAL_OVERSCAN_ROWS,
+      ),
+    });
+  }, [virtualMetrics.rowHeight, virtualRowCount]);
+
+  useEffect(() => {
+    if (!useVirtualRows) return;
+    const root = virtualRootRef.current;
+    const measuringRow = measuringRowRef.current;
+    if (!root || !measuringRow) return;
+
+    const measure = () => {
+      const firstColumn = measuringRow.firstElementChild as HTMLElement | null;
+      const firstResidue = firstColumn?.querySelector(
+        "[data-sequence-row]",
+      ) as HTMLElement | null;
+      const residueGlyph = firstResidue?.lastElementChild as HTMLElement | null;
+      const residueHeight = Math.max(
+        1,
+        firstResidue?.getBoundingClientRect().height ?? 24,
+      );
+      const next = {
+        columnWidth: Math.max(
+          1,
+          residueGlyph?.getBoundingClientRect().width ?? 10,
+        ),
+        rowHeight:
+          16 +
+          annotatedSequences.length * residueHeight +
+          (maxAnnotationStack + 1) * 12,
+        containerWidth: Math.max(1, root.clientWidth),
+        residueHeight,
+      };
+      setVirtualMetrics((current) =>
+        current.columnWidth === next.columnWidth &&
+        current.rowHeight === next.rowHeight &&
+        current.containerWidth === next.containerWidth &&
+        current.residueHeight === next.residueHeight
+          ? current
+          : next,
+      );
+    };
+    measure();
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(root);
+    window.addEventListener("scroll", updateVisibleRows, true);
+    window.addEventListener("resize", updateVisibleRows);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("scroll", updateVisibleRows, true);
+      window.removeEventListener("resize", updateVisibleRows);
+    };
+  }, [
+    annotatedSequences.length,
+    maxAnnotationStack,
+    updateVisibleRows,
+    useVirtualRows,
+  ]);
+
+  useEffect(() => {
+    if (useVirtualRows) updateVisibleRows();
+  }, [columnsPerRow, updateVisibleRows, useVirtualRows]);
+
+  const renderColumn = (
+    baseIdx: number,
+    style?: CSSProperties,
+    sequenceStart = 0,
+    sequenceEnd = annotatedSequences.length,
+    showAnnotations = true,
+  ) => (
+    <div
+      className="nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between"
+      key={`base-${baseIdx}`}
+      style={style}
+      data-sequence-position={baseIdx}
+    >
+      <div
+        style={
+          useVirtualRows
+            ? {
+                position: "absolute",
+                top: 16 + sequenceStart * virtualMetrics.residueHeight,
+              }
+            : { display: "contents" }
+        }
+      >
+        {annotatedSequences
+          .slice(sequenceStart, sequenceEnd)
+          .map((_, offset) => {
+            const sequenceIdx = sequenceStart + offset;
+            const base = basesBySequenceAndIndex[sequenceIdx].get(baseIdx) || {
+              base: " ",
+              annotations: [],
+              index: baseIdx,
+            };
+            const firstSeqBase = basesBySequenceAndIndex[0]?.get(baseIdx);
+            const isMisaligned =
+              highlightMisalignments &&
+              sequenceIdx > 0 &&
+              firstSeqBase &&
+              base.base !== " " &&
+              firstSeqBase.base !== " " &&
+              base.base !== "-" &&
+              firstSeqBase.base !== "-" &&
+              base.base !== firstSeqBase.base;
+
+            return (
+              <div
+                key={`sequence-${sequenceIdx}-base-${baseIdx}`}
+                className="nsv:text-center nsv:whitespace-nowrap"
+                data-sequence-row={sequenceIdx}
+                onMouseEnter={() => {
+                  setHoveredPosition(base.index);
+                  if (mouseDown.current && selection) {
+                    setSelection({ ...selection, end: base.index });
+                  }
+                }}
+                onMouseLeave={() => setHoveredPosition(null)}
+                onMouseDown={() => {
+                  mouseDown.current = true;
+                  setSelection({
+                    start: base.index,
+                    end: base.index,
+                    direction: "forward",
+                  });
+                }}
+                onMouseUp={handleMouseUp}
+              >
+                <CharComponent
+                  char={`| ${base.index}`}
+                  index={baseIdx}
+                  charClassName={classNames(
+                    "nsv:absolute nsv:-top-4 nsv:left-0",
+                    "nsv:[border-bottom-width:1px]",
+                    indicesClassName({ base, sequenceIdx }),
+                  )}
+                />
+                <CharComponent
+                  char={base.base}
+                  index={baseIdx}
+                  charClassName={classNames(
+                    charClassName({ base, sequenceIdx }),
+                    isMisaligned && "nsv:text-sequences-mismatch!",
+                    ["-", " "].includes(base.base) && "nsv:text-sequences-gap!",
+                    baseInSelection({
+                      baseIndex: baseIdx,
+                      selection,
+                      sequenceLength: annotatedSequences[sequenceIdx].length,
+                    }) &&
+                      base.base !== " " &&
+                      classNames("nsv-sequence-selection", selectionClassName),
+                  )}
+                />
+              </div>
+            );
+          })}
+      </div>
+      {showAnnotations && (
+        <div
+          style={
+            useVirtualRows
+              ? {
+                  position: "absolute",
+                  top:
+                    16 +
+                    annotatedSequences.length * virtualMetrics.residueHeight,
+                }
+              : { display: "contents" }
+          }
+        >
+          <SequenceAnnotation
+            annotations={orderedAnnotations}
+            index={baseIdx}
+            maxAnnotationStack={maxAnnotationStack + 1}
+            setHoveredPosition={setHoveredPosition}
+            setActiveAnnotation={setActiveAnnotation}
+            maxSequenceLength={maxSequenceLength}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  if (useVirtualRows) {
+    const rows = Array.from(
+      { length: Math.max(0, visibleRows.end - visibleRows.start) },
+      (_, offset) => visibleRows.start + offset,
+    );
+    return (
+      <div
+        ref={virtualRootRef}
+        className="nsv:relative nsv:w-full"
+        style={{ height: virtualRowCount * virtualMetrics.rowHeight }}
+        data-virtualized="true"
+      >
+        {rows.map((rowIndex) => {
+          const first = rowIndex * columnsPerRow;
+          const last = Math.min(maxSequenceLength, first + columnsPerRow);
+          const rowTop = rowIndex * virtualMetrics.rowHeight;
+          const sequenceTop = rowTop + 16;
+          const sequenceStart = Math.max(
+            0,
+            Math.floor(
+              (visiblePixels.top - sequenceTop) / virtualMetrics.residueHeight,
+            ) - 3,
+          );
+          const sequenceEnd = Math.min(
+            annotatedSequences.length,
+            Math.ceil(
+              (visiblePixels.bottom - sequenceTop) /
+                virtualMetrics.residueHeight,
+            ) + 3,
+          );
+          const annotationTop =
+            sequenceTop +
+            annotatedSequences.length * virtualMetrics.residueHeight;
+          const showAnnotations =
+            annotationTop <= visiblePixels.bottom + 48 &&
+            annotationTop + (maxAnnotationStack + 1) * 12 >=
+              visiblePixels.top - 48;
+          return (
+            <div
+              key={`virtual-row-${rowIndex}`}
+              ref={rowIndex === visibleRows.start ? measuringRowRef : undefined}
+              className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
+              style={{
+                top: rowTop,
+                minHeight: virtualMetrics.rowHeight,
+              }}
+              data-virtual-row={rowIndex}
+            >
+              {Array.from({ length: last - first }, (_, index) =>
+                renderColumn(
+                  first + index,
+                  {
+                    flex: `0 0 ${virtualMetrics.columnWidth}px`,
+                    height: virtualMetrics.rowHeight,
+                  },
+                  sequenceStart,
+                  Math.max(sequenceStart + 1, sequenceEnd),
+                  showAnnotations,
+                ),
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <>
-      {Array.from({ length: maxSequenceLength }, (_, baseIdx) => {
-        return (
-          <div
-            className={classNames(
-              "nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between",
-            )}
-            key={`base-${baseIdx}`}
-          >
-            {annotatedSequences.map((_, sequenceIdx) => {
-              const base = basesBySequenceAndIndex[sequenceIdx].get(
-                baseIdx,
-              ) || { base: " ", annotations: [], index: baseIdx };
-
-              // Check for misalignment with first sequence
-              const firstSeqBase = basesBySequenceAndIndex[0]?.get(baseIdx);
-              const isMisaligned =
-                highlightMisalignments &&
-                sequenceIdx > 0 &&
-                firstSeqBase &&
-                base.base !== " " &&
-                firstSeqBase.base !== " " &&
-                base.base !== "-" &&
-                firstSeqBase.base !== "-" &&
-                base.base !== firstSeqBase.base;
-
-              return (
-                <div
-                  key={`sequence-${sequenceIdx}-base-${baseIdx}`}
-                  className={classNames(
-                    "nsv:text-center nsv:whitespace-nowrap",
-                  )}
-                  onMouseEnter={() => {
-                    setHoveredPosition(base.index);
-                    // if mouse is down, update selection
-                    if (mouseDown.current && selection) {
-                      setSelection({
-                        ...selection,
-                        end: base.index,
-                      });
-                    }
-                  }}
-                  onMouseLeave={() => setHoveredPosition(null)}
-                  onMouseDown={() => {
-                    mouseDown.current = true;
-                    setSelection({
-                      start: base.index,
-                      end: base.index,
-                      direction: "forward",
-                    });
-                  }}
-                  onMouseUp={handleMouseUp}
-                >
-                  <CharComponent
-                    char={`| ${base.index}`}
-                    index={baseIdx}
-                    charClassName={classNames(
-                      "nsv:absolute nsv:-top-4 nsv:left-0",
-                      "nsv:[border-bottom-width:1px]",
-                      indicesClassName({
-                        base,
-                        sequenceIdx,
-                      }),
-                    )}
-                  />
-                  <CharComponent
-                    char={base.base}
-                    index={baseIdx}
-                    charClassName={classNames(
-                      charClassName({
-                        base,
-                        sequenceIdx,
-                      }),
-                      isMisaligned && "nsv:text-sequences-mismatch!",
-                      ["-", " "].includes(base.base) &&
-                        "nsv:text-sequences-gap!",
-                      baseInSelection({
-                        baseIndex: baseIdx,
-                        selection,
-                        sequenceLength: annotatedSequences[sequenceIdx].length,
-                      }) &&
-                        base.base !== " " &&
-                        classNames(
-                          "nsv-sequence-selection",
-                          selectionClassName,
-                        ),
-                    )}
-                  />
-                </div>
-              );
-            })}
-            <SequenceAnnotation
-              annotations={orderedAnnotations}
-              index={baseIdx}
-              maxAnnotationStack={maxAnnotationStack + 1}
-              setHoveredPosition={setHoveredPosition}
-              setActiveAnnotation={setActiveAnnotation}
-              maxSequenceLength={maxSequenceLength}
-            />
-          </div>
-        );
-      })}
+      {Array.from({ length: maxSequenceLength }, (_, baseIdx) =>
+        renderColumn(baseIdx),
+      )}
     </>
   );
 };

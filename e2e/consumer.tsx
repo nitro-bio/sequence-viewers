@@ -46,6 +46,9 @@ const feature: Annotation = {
 };
 
 export function App() {
+  const showVirtualFixture = new URLSearchParams(location.search).has(
+    "virtual",
+  );
   const [sequences, updateSequences] = useState([
     "ACGTACGTACGT",
     "ACGTTCGTACG",
@@ -190,7 +193,67 @@ export function App() {
         {JSON.stringify(selection)}
       </output>
       <output data-testid="alignment-updates">{alignmentUpdates}</output>
+      {showVirtualFixture && <VirtualSequenceFixture />}
     </main>
+  );
+}
+
+function VirtualSequenceFixture() {
+  const [selection, setSelection] = useState<AriadneSelection | null>({
+    start: 0,
+    end: 0,
+    direction: "forward",
+  });
+  const [narrow, setNarrow] = useState(false);
+  const sequence = "ACGT".repeat(5_000);
+  return (
+    <section data-testid="virtual-sequence-viewer">
+      <button
+        onClick={() =>
+          setSelection({
+            start: 15_000,
+            end: 15_010,
+            direction: "forward",
+          })
+        }
+      >
+        Select offscreen range
+      </button>
+      <button onClick={() => setNarrow((value) => !value)}>
+        Resize viewer
+      </button>
+      <div
+        data-testid="virtual-scroll-container"
+        style={{ height: 360, overflow: "auto", width: narrow ? 520 : 900 }}
+      >
+        <SequenceViewer
+          sequences={[sequence, sequence]}
+          annotations={[
+            {
+              ...feature,
+              start: 15_000,
+              end: 15_010,
+              text: "Virtual feature",
+            },
+          ]}
+          selection={selection}
+          setSelection={setSelection}
+          charClassName={() => "virtual-char"}
+        />
+      </div>
+      <output data-testid="virtual-selection">
+        {JSON.stringify(selection)}
+      </output>
+      <div
+        data-testid="many-row-scroll-container"
+        style={{ height: 240, overflow: "auto", width: 900 }}
+      >
+        <SequenceViewer
+          sequences={Array.from({ length: 10_000 }, () => "ACGTACGT")}
+          hideMetadataBar
+        />
+      </div>
+    </section>
   );
 }
 

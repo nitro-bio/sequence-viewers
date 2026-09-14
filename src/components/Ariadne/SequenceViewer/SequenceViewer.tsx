@@ -445,20 +445,22 @@ export const SeqContent = ({
     const root = virtualRootRef.current;
     const glyph = measuringGlyphRef.current;
     if (!root || !glyph) return;
-    let ancestor = root.parentElement;
-    let nearest: HTMLElement | null = null;
-    while (ancestor) {
-      if (
-        ["auto", "scroll"].includes(getComputedStyle(ancestor).overflowY) &&
-        ancestor.scrollHeight > ancestor.clientHeight
-      ) {
-        nearest = ancestor;
-        break;
+    const findScrollElement = () => {
+      let ancestor = root.parentElement;
+      while (ancestor) {
+        if (
+          ["auto", "scroll"].includes(getComputedStyle(ancestor).overflowY) &&
+          ancestor.scrollHeight > ancestor.clientHeight
+        ) {
+          return ancestor;
+        }
+        ancestor = ancestor.parentElement;
       }
-      ancestor = ancestor.parentElement;
-    }
-    setScrollElement(nearest);
+      return null;
+    };
     const measure = () => {
+      const nearest = findScrollElement();
+      setScrollElement((current) => (current === nearest ? current : nearest));
       const glyphRect = glyph.getBoundingClientRect();
       setVirtualMetrics((current) => {
         const next = {
@@ -481,6 +483,12 @@ export const SeqContent = ({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
+    observer.observe(glyph);
+    let ancestor = root.parentElement;
+    while (ancestor) {
+      observer.observe(ancestor);
+      ancestor = ancestor.parentElement;
+    }
     return () => observer.disconnect();
   }, [useVirtualRows]);
 
@@ -519,9 +527,21 @@ export const SeqContent = ({
   const lastVirtualLine = virtualItems[virtualItems.length - 1]?.index;
 
   useIsomorphicLayoutEffect(() => {
+    if (useVirtualRows) virtualizer.measure();
+  }, [estimateLineSize, useVirtualRows, virtualizer]);
+
+  useIsomorphicLayoutEffect(() => {
     if (!useVirtualRows) return;
     const previousColumns = previousColumnsRef.current;
     if (previousColumns !== undefined && previousColumns !== columnsPerRow) {
+      const root = virtualRootRef.current;
+      if (!scrollElement && root) {
+        const rootRect = root.getBoundingClientRect();
+        if (rootRect.bottom <= 0 || rootRect.top >= window.innerHeight) {
+          previousColumnsRef.current = columnsPerRow;
+          return;
+        }
+      }
       const previousLine = visibleLineRef.current;
       const coordinate =
         Math.floor(previousLine / linesPerBlock) * previousColumns;
@@ -531,7 +551,13 @@ export const SeqContent = ({
       virtualizer.scrollToIndex(nextLine, { align: "start" });
     }
     previousColumnsRef.current = columnsPerRow;
-  }, [columnsPerRow, linesPerBlock, useVirtualRows, virtualizer]);
+  }, [
+    columnsPerRow,
+    linesPerBlock,
+    scrollElement,
+    useVirtualRows,
+    virtualizer,
+  ]);
 
   useEffect(() => {
     const firstVisibleLine = virtualizer.range?.startIndex;

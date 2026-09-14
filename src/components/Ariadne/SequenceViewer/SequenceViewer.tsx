@@ -15,17 +15,21 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
+import { useVirtualizer, useWindowVirtualizer } from "@tanstack/react-virtual";
 import type {
   AnnotatedBase,
   Annotation,
   AriadneSelection,
   StackedAnnotation,
 } from "../types";
+
+const useIsomorphicLayoutEffect =
+  typeof document === "undefined" ? useEffect : useLayoutEffect;
 
 import {
   Select,
@@ -349,24 +353,18 @@ export const SeqContent = ({
   highlightMisalignments?: boolean;
 }) => {
   const VIRTUAL_CELL_THRESHOLD = 5_000;
-  const VIRTUAL_OVERSCAN_ROWS = 3;
   const mouseDown = useRef(false);
   const virtualRootRef = useRef<HTMLDivElement>(null);
   const measuringGlyphRef = useRef<HTMLSpanElement>(null);
-  const measuredContainerWidthRef = useRef(0);
-  const visibleTopRef = useRef(0);
-  const resizeAnchorRef = useRef<{
-    position: number;
-    withinRow: number;
-  } | null>(null);
   const [virtualMetrics, setVirtualMetrics] = useState({
     columnWidth: 10,
-    rowHeight: 52,
     containerWidth: 800,
     residueHeight: 24,
   });
-  const [visibleRows, setVisibleRows] = useState({ start: 0, end: 8 });
-  const [visiblePixels, setVisiblePixels] = useState({ top: 0, bottom: 900 });
+  const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const previousColumnsRef = useRef<number>();
+  const visibleLineRef = useRef(0);
   const handleMouseUp = useCallback(() => {
     mouseDown.current = false;
   }, []);
@@ -437,139 +435,109 @@ export const SeqContent = ({
     1,
     Math.floor(virtualMetrics.containerWidth / virtualMetrics.columnWidth),
   );
-  const virtualRowCount = Math.ceil(maxSequenceLength / columnsPerRow);
+  const coordinateBlockCount = Math.ceil(maxSequenceLength / columnsPerRow);
+  const annotationLineCount = maxAnnotationStack + 1;
+  const linesPerBlock = annotatedSequences.length + annotationLineCount;
+  const virtualLineCount = coordinateBlockCount * linesPerBlock;
 
-  const updateVisibleRows = useCallback(() => {
+  useIsomorphicLayoutEffect(() => {
+    if (!useVirtualRows) return;
     const root = virtualRootRef.current;
-    if (!root) return;
-    const rect = root.getBoundingClientRect();
-    const viewportHeight =
-      window.innerHeight || document.documentElement.clientHeight;
-    let clipTop = 0;
-    let clipBottom = viewportHeight;
+    const glyph = measuringGlyphRef.current;
+    if (!root || !glyph) return;
     let ancestor = root.parentElement;
+    let nearest: HTMLElement | null = null;
     while (ancestor) {
-      const overflow = getComputedStyle(ancestor).overflowY;
-      if (["auto", "scroll", "hidden", "clip"].includes(overflow)) {
-        const ancestorRect = ancestor.getBoundingClientRect();
-        clipTop = Math.max(clipTop, ancestorRect.top);
-        clipBottom = Math.min(clipBottom, ancestorRect.bottom);
+      if (
+        ["auto", "scroll"].includes(getComputedStyle(ancestor).overflowY) &&
+        ancestor.scrollHeight > ancestor.clientHeight
+      ) {
+        nearest = ancestor;
+        break;
       }
       ancestor = ancestor.parentElement;
     }
-    const top = Math.min(rect.height, Math.max(0, clipTop - rect.top));
-    const bottom = Math.max(
-      top,
-      Math.min(rect.height, Math.max(0, clipBottom - rect.top)),
-    );
-    visibleTopRef.current = top;
-    const firstVisible = Math.floor(top / virtualMetrics.rowHeight);
-    const lastVisible = Math.ceil(bottom / virtualMetrics.rowHeight);
-    setVisiblePixels((current) =>
-      current.top === top && current.bottom === bottom
-        ? current
-        : { top, bottom },
-    );
-    const nextRows = {
-      start: Math.min(
-        virtualRowCount,
-        Math.max(0, firstVisible - VIRTUAL_OVERSCAN_ROWS),
-      ),
-      end: Math.min(
-        virtualRowCount,
-        Math.max(firstVisible + 1, lastVisible) + VIRTUAL_OVERSCAN_ROWS,
-      ),
-    };
-    setVisibleRows((current) =>
-      current.start === nextRows.start && current.end === nextRows.end
-        ? current
-        : nextRows,
-    );
-  }, [virtualMetrics.rowHeight, virtualRowCount]);
-
-  useEffect(() => {
-    if (!useVirtualRows) return;
-    const root = virtualRootRef.current;
-    const measuringGlyph = measuringGlyphRef.current;
-    if (!root || !measuringGlyph) return;
-
+    setScrollElement(nearest);
     const measure = () => {
-      const glyphRect = measuringGlyph.getBoundingClientRect();
-      const residueHeight = Math.max(1, glyphRect.height || 24);
-      const hasMeasured = measuredContainerWidthRef.current > 0;
-      measuredContainerWidthRef.current = root.clientWidth;
-      const next = {
-        columnWidth: Math.max(1, (glyphRect.width || 9) + 1),
-        rowHeight:
-          16 +
-          annotatedSequences.length * residueHeight +
-          (maxAnnotationStack + 1) * 12,
-        containerWidth: Math.max(1, root.clientWidth),
-        residueHeight,
-      };
+      const glyphRect = glyph.getBoundingClientRect();
       setVirtualMetrics((current) => {
-        if (current.containerWidth !== next.containerWidth && hasMeasured) {
-          const previousColumns = Math.max(
-            1,
-            Math.floor(current.containerWidth / current.columnWidth),
-          );
-          resizeAnchorRef.current = {
-            position:
-              Math.floor(visibleTopRef.current / current.rowHeight) *
-              previousColumns,
-            withinRow: visibleTopRef.current % current.rowHeight,
-          };
-        }
+        const next = {
+          columnWidth: Math.max(1, (glyphRect.width || 9) + 1),
+          containerWidth: Math.max(1, root.clientWidth),
+          residueHeight: Math.max(1, glyphRect.height || 24),
+        };
         return current.columnWidth === next.columnWidth &&
-          current.rowHeight === next.rowHeight &&
           current.containerWidth === next.containerWidth &&
           current.residueHeight === next.residueHeight
           ? current
           : next;
       });
+      const rootRect = root.getBoundingClientRect();
+      const margin = nearest
+        ? rootRect.top - nearest.getBoundingClientRect().top + nearest.scrollTop
+        : rootRect.top + window.scrollY;
+      setScrollMargin((current) => (current === margin ? current : margin));
     };
     measure();
-    const resizeObserver = new ResizeObserver(() => {
-      if (root.clientWidth !== measuredContainerWidthRef.current) measure();
-    });
-    resizeObserver.observe(root);
-    window.addEventListener("scroll", updateVisibleRows, true);
-    window.addEventListener("resize", updateVisibleRows);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("scroll", updateVisibleRows, true);
-      window.removeEventListener("resize", updateVisibleRows);
-    };
-  }, [
-    annotatedSequences.length,
-    maxAnnotationStack,
-    updateVisibleRows,
-    useVirtualRows,
-  ]);
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [useVirtualRows]);
 
-  useEffect(() => {
-    if (useVirtualRows) updateVisibleRows();
-  }, [columnsPerRow, updateVisibleRows, useVirtualRows]);
-
-  useEffect(() => {
-    const anchor = resizeAnchorRef.current;
-    const root = virtualRootRef.current;
-    if (!useVirtualRows || !anchor || !root) return;
-    resizeAnchorRef.current = null;
-    const targetTop =
-      Math.floor(anchor.position / columnsPerRow) * virtualMetrics.rowHeight +
-      anchor.withinRow;
-    const delta = targetTop - visibleTopRef.current;
-    let ancestor = root.parentElement;
-    while (ancestor) {
-      if (["auto", "scroll"].includes(getComputedStyle(ancestor).overflowY)) {
-        ancestor.scrollTop += delta;
-        return;
+  const estimateLineSize = useCallback(
+    (lineIndex: number) => {
+      const lineInBlock = lineIndex % Math.max(linesPerBlock, 1);
+      if (lineInBlock < annotatedSequences.length) {
+        return virtualMetrics.residueHeight + (lineInBlock === 0 ? 16 : 0);
       }
-      ancestor = ancestor.parentElement;
+      return 12;
+    },
+    [annotatedSequences.length, linesPerBlock, virtualMetrics.residueHeight],
+  );
+  const elementVirtualizer = useVirtualizer({
+    count: virtualLineCount,
+    getScrollElement: () => scrollElement,
+    estimateSize: estimateLineSize,
+    overscan: 3,
+    scrollMargin,
+    enabled: useVirtualRows && Boolean(scrollElement),
+    initialRect: { width: 800, height: 240 },
+    useFlushSync: false,
+  });
+  const windowVirtualizer = useWindowVirtualizer({
+    count: virtualLineCount,
+    estimateSize: estimateLineSize,
+    overscan: 3,
+    scrollMargin,
+    enabled: useVirtualRows && !scrollElement,
+    initialRect: { width: 800, height: 240 },
+    useFlushSync: false,
+  });
+  const virtualizer = scrollElement ? elementVirtualizer : windowVirtualizer;
+  const virtualItems = virtualizer.getVirtualItems();
+  const firstVirtualLine = virtualItems[0]?.index;
+  const lastVirtualLine = virtualItems[virtualItems.length - 1]?.index;
+
+  useIsomorphicLayoutEffect(() => {
+    if (!useVirtualRows) return;
+    const previousColumns = previousColumnsRef.current;
+    if (previousColumns !== undefined && previousColumns !== columnsPerRow) {
+      const previousLine = visibleLineRef.current;
+      const coordinate =
+        Math.floor(previousLine / linesPerBlock) * previousColumns;
+      const lineInBlock = previousLine % linesPerBlock;
+      const nextLine =
+        Math.floor(coordinate / columnsPerRow) * linesPerBlock + lineInBlock;
+      virtualizer.scrollToIndex(nextLine, { align: "start" });
     }
-    window.scrollBy({ top: delta });
-  }, [columnsPerRow, useVirtualRows, virtualMetrics.rowHeight]);
+    previousColumnsRef.current = columnsPerRow;
+  }, [columnsPerRow, linesPerBlock, useVirtualRows, virtualizer]);
+
+  useEffect(() => {
+    const firstVisibleLine = virtualizer.range?.startIndex;
+    if (firstVisibleLine !== undefined)
+      visibleLineRef.current = firstVisibleLine;
+  }, [virtualizer, virtualizer.range?.startIndex]);
 
   useEffect(() => {
     if (!useVirtualRows) return;
@@ -579,143 +547,132 @@ export const SeqContent = ({
     setActiveAnnotation,
     setHoveredPosition,
     useVirtualRows,
-    visiblePixels.bottom,
-    visiblePixels.top,
-    visibleRows.end,
-    visibleRows.start,
+    firstVirtualLine,
+    lastVirtualLine,
   ]);
 
-  const renderColumn = (
+  const renderResidue = (
     baseIdx: number,
-    style?: CSSProperties,
-    sequenceStart = 0,
-    sequenceEnd = annotatedSequences.length,
-    showAnnotations = true,
-  ) => (
+    sequenceIdx: number,
+    virtualWidth?: number,
+  ) => {
+    const base = basesBySequenceAndIndex[sequenceIdx].get(baseIdx) || {
+      base: " ",
+      annotations: [],
+      index: baseIdx,
+    };
+    const firstSeqBase = basesBySequenceAndIndex[0]?.get(baseIdx);
+    const isMisaligned =
+      highlightMisalignments &&
+      sequenceIdx > 0 &&
+      firstSeqBase &&
+      base.base !== " " &&
+      firstSeqBase.base !== " " &&
+      base.base !== "-" &&
+      firstSeqBase.base !== "-" &&
+      base.base !== firstSeqBase.base;
+
+    return (
+      <div
+        key={`sequence-${sequenceIdx}-base-${baseIdx}`}
+        className={classNames(
+          "nsv:text-center nsv:whitespace-nowrap",
+          virtualWidth !== undefined && "nsv:relative",
+        )}
+        style={
+          virtualWidth === undefined
+            ? undefined
+            : { flex: `0 0 ${virtualWidth}px` }
+        }
+        data-sequence-position={
+          virtualWidth === undefined ? undefined : baseIdx
+        }
+        data-sequence-row={sequenceIdx}
+        onMouseEnter={() => {
+          setHoveredPosition(base.index);
+          if (mouseDown.current && selection) {
+            setSelection({ ...selection, end: base.index });
+          }
+        }}
+        onMouseLeave={() => setHoveredPosition(null)}
+        onMouseDown={() => {
+          mouseDown.current = true;
+          setSelection({
+            start: base.index,
+            end: base.index,
+            direction: "forward",
+          });
+        }}
+        onMouseUp={handleMouseUp}
+      >
+        {(virtualWidth === undefined || sequenceIdx === 0) && (
+          <CharComponent
+            char={`| ${base.index}`}
+            index={baseIdx}
+            charClassName={classNames(
+              "nsv:absolute nsv:-top-4 nsv:left-0",
+              "nsv:[border-bottom-width:1px]",
+              indicesClassName({ base, sequenceIdx }),
+            )}
+          />
+        )}
+        <CharComponent
+          char={base.base}
+          index={baseIdx}
+          charClassName={classNames(
+            charClassName({ base, sequenceIdx }),
+            isMisaligned && "nsv:text-sequences-mismatch!",
+            ["-", " "].includes(base.base) && "nsv:text-sequences-gap!",
+            baseInSelection({
+              baseIndex: baseIdx,
+              selection,
+              sequenceLength: annotatedSequences[sequenceIdx].length,
+            }) &&
+              base.base !== " " &&
+              classNames("nsv-sequence-selection", selectionClassName),
+          )}
+        />
+      </div>
+    );
+  };
+
+  const renderSmallColumn = (baseIdx: number) => (
     <div
       className="nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between"
       key={`base-${baseIdx}`}
-      style={style}
       data-sequence-position={baseIdx}
     >
-      <div
-        style={
-          useVirtualRows
-            ? {
-                position: "absolute",
-                top: sequenceStart * virtualMetrics.residueHeight,
-              }
-            : { display: "contents" }
-        }
-      >
-        {annotatedSequences
-          .slice(sequenceStart, sequenceEnd)
-          .map((_, offset) => {
-            const sequenceIdx = sequenceStart + offset;
-            const base = basesBySequenceAndIndex[sequenceIdx].get(baseIdx) || {
-              base: " ",
-              annotations: [],
-              index: baseIdx,
-            };
-            const firstSeqBase = basesBySequenceAndIndex[0]?.get(baseIdx);
-            const isMisaligned =
-              highlightMisalignments &&
-              sequenceIdx > 0 &&
-              firstSeqBase &&
-              base.base !== " " &&
-              firstSeqBase.base !== " " &&
-              base.base !== "-" &&
-              firstSeqBase.base !== "-" &&
-              base.base !== firstSeqBase.base;
-
-            return (
-              <div
-                key={`sequence-${sequenceIdx}-base-${baseIdx}`}
-                className="nsv:text-center nsv:whitespace-nowrap"
-                data-sequence-row={sequenceIdx}
-                onMouseEnter={() => {
-                  setHoveredPosition(base.index);
-                  if (mouseDown.current && selection) {
-                    setSelection({ ...selection, end: base.index });
-                  }
-                }}
-                onMouseLeave={() => setHoveredPosition(null)}
-                onMouseDown={() => {
-                  mouseDown.current = true;
-                  setSelection({
-                    start: base.index,
-                    end: base.index,
-                    direction: "forward",
-                  });
-                }}
-                onMouseUp={handleMouseUp}
-              >
-                <CharComponent
-                  char={`| ${base.index}`}
-                  index={baseIdx}
-                  charClassName={classNames(
-                    "nsv:absolute nsv:-top-4 nsv:left-0",
-                    "nsv:[border-bottom-width:1px]",
-                    indicesClassName({ base, sequenceIdx }),
-                  )}
-                />
-                <CharComponent
-                  char={base.base}
-                  index={baseIdx}
-                  charClassName={classNames(
-                    charClassName({ base, sequenceIdx }),
-                    isMisaligned && "nsv:text-sequences-mismatch!",
-                    ["-", " "].includes(base.base) && "nsv:text-sequences-gap!",
-                    baseInSelection({
-                      baseIndex: baseIdx,
-                      selection,
-                      sequenceLength: annotatedSequences[sequenceIdx].length,
-                    }) &&
-                      base.base !== " " &&
-                      classNames("nsv-sequence-selection", selectionClassName),
-                  )}
-                />
-              </div>
-            );
-          })}
+      <div style={{ display: "contents" }}>
+        {annotatedSequences.map((_, sequenceIdx) =>
+          renderResidue(baseIdx, sequenceIdx),
+        )}
       </div>
-      {showAnnotations && (
-        <div
-          style={
-            useVirtualRows
-              ? {
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  top: annotatedSequences.length * virtualMetrics.residueHeight,
-                }
-              : { display: "contents" }
-          }
-        >
-          <SequenceAnnotation
-            annotations={orderedAnnotations}
-            index={baseIdx}
-            maxAnnotationStack={maxAnnotationStack + 1}
-            setHoveredPosition={setHoveredPosition}
-            setActiveAnnotation={setActiveAnnotation}
-            maxSequenceLength={maxSequenceLength}
-          />
-        </div>
-      )}
+      <div style={{ display: "contents" }}>
+        <SequenceAnnotation
+          annotations={orderedAnnotations}
+          index={baseIdx}
+          maxAnnotationStack={maxAnnotationStack + 1}
+          setHoveredPosition={setHoveredPosition}
+          setActiveAnnotation={setActiveAnnotation}
+          maxSequenceLength={maxSequenceLength}
+        />
+      </div>
     </div>
   );
 
   if (useVirtualRows) {
-    const rows = Array.from(
-      { length: Math.max(0, visibleRows.end - visibleRows.start) },
-      (_, offset) => visibleRows.start + offset,
-    );
     return (
       <div
         ref={virtualRootRef}
         className="nsv:relative nsv:w-full"
-        style={{ height: virtualRowCount * virtualMetrics.rowHeight }}
+        style={{
+          height: virtualizer.getTotalSize(),
+          overflowAnchor: "none",
+        }}
         data-virtualized="true"
+        data-columns-per-row={columnsPerRow}
+        data-lines-per-block={linesPerBlock}
+        data-coordinate-block-count={coordinateBlockCount}
       >
         <span
           ref={measuringGlyphRef}
@@ -724,53 +681,52 @@ export const SeqContent = ({
         >
           M
         </span>
-        {rows.map((rowIndex) => {
-          const first = rowIndex * columnsPerRow;
+        {virtualItems.map((virtualItem) => {
+          const blockIndex = Math.floor(virtualItem.index / linesPerBlock);
+          const lineInBlock = virtualItem.index % linesPerBlock;
+          const first = blockIndex * columnsPerRow;
           const last = Math.min(maxSequenceLength, first + columnsPerRow);
-          const rowTop = rowIndex * virtualMetrics.rowHeight;
-          const sequenceTop = rowTop + 16;
-          const sequenceStart = Math.max(
-            0,
-            Math.floor(
-              (visiblePixels.top - sequenceTop) / virtualMetrics.residueHeight,
-            ) - 3,
-          );
-          const sequenceEnd = Math.min(
-            annotatedSequences.length,
-            Math.ceil(
-              (visiblePixels.bottom - sequenceTop) /
-                virtualMetrics.residueHeight,
-            ) + 3,
-          );
-          const annotationTop =
-            sequenceTop +
-            annotatedSequences.length * virtualMetrics.residueHeight;
-          const showAnnotations =
-            annotationTop <= visiblePixels.bottom + 48 &&
-            annotationTop + (maxAnnotationStack + 1) * 12 >=
-              visiblePixels.top - 48;
+          const isSequenceLine = lineInBlock < annotatedSequences.length;
+          const sequenceIdx = lineInBlock;
+          const annotationStack = lineInBlock - annotatedSequences.length;
           return (
             <div
-              key={`virtual-row-${rowIndex}`}
+              key={virtualItem.key}
               className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
               style={{
-                top: rowTop,
-                height: virtualMetrics.rowHeight,
+                top: 0,
+                height: virtualItem.size,
+                paddingTop: isSequenceLine && sequenceIdx === 0 ? 16 : 0,
+                transform: `translateY(${virtualItem.start - scrollMargin}px)`,
               }}
-              data-virtual-row={rowIndex}
+              data-index={virtualItem.index}
+              data-virtual-row={blockIndex}
+              data-virtual-line={virtualItem.index}
+              data-line-kind={isSequenceLine ? "sequence" : "annotation"}
+              data-sequence-index={isSequenceLine ? sequenceIdx : undefined}
             >
-              {Array.from({ length: last - first }, (_, index) =>
-                renderColumn(
-                  first + index,
-                  {
-                    flex: `0 0 ${virtualMetrics.columnWidth}px`,
-                    height: virtualMetrics.rowHeight - 16,
-                  },
-                  sequenceStart,
-                  Math.max(sequenceStart + 1, sequenceEnd),
-                  showAnnotations,
-                ),
-              )}
+              {Array.from({ length: last - first }, (_, offset) => {
+                const baseIdx = first + offset;
+                if (!isSequenceLine) {
+                  return (
+                    <SequenceAnnotationLine
+                      key={`annotation-${annotationStack}-${baseIdx}`}
+                      annotations={orderedAnnotations}
+                      index={baseIdx}
+                      stack={annotationStack}
+                      setHoveredPosition={setHoveredPosition}
+                      setActiveAnnotation={setActiveAnnotation}
+                      maxSequenceLength={maxSequenceLength}
+                      width={virtualMetrics.columnWidth}
+                    />
+                  );
+                }
+                return renderResidue(
+                  baseIdx,
+                  sequenceIdx,
+                  virtualMetrics.columnWidth,
+                );
+              })}
             </div>
           );
         })}
@@ -781,9 +737,58 @@ export const SeqContent = ({
   return (
     <>
       {Array.from({ length: maxSequenceLength }, (_, baseIdx) =>
-        renderColumn(baseIdx),
+        renderSmallColumn(baseIdx),
       )}
     </>
+  );
+};
+
+const SequenceAnnotationLine = ({
+  annotations,
+  index,
+  stack,
+  setHoveredPosition,
+  setActiveAnnotation,
+  maxSequenceLength,
+  width,
+}: {
+  annotations: StackedAnnotation[];
+  index: number;
+  stack: number;
+  setHoveredPosition: (position: number | null) => void;
+  setActiveAnnotation: (annotation: StackedAnnotation | null) => void;
+  maxSequenceLength: number;
+  width: number;
+}) => {
+  const annotation = annotations.find(
+    (candidate) =>
+      candidate.stack === stack &&
+      baseInSelection({
+        baseIndex: index,
+        selection: candidate,
+        sequenceLength: maxSequenceLength,
+      }),
+  );
+  return (
+    <div
+      style={{ flex: `0 0 ${width}px`, height: 12 }}
+      data-sequence-position={index}
+      onMouseEnter={() => {
+        setHoveredPosition(index);
+        setActiveAnnotation(annotation ?? null);
+      }}
+      onMouseLeave={() => {
+        setHoveredPosition(null);
+        setActiveAnnotation(null);
+      }}
+      className={classNames(
+        "nsv:group/annotation nsv:border-black",
+        annotation?.className,
+      )}
+      onClick={() =>
+        annotation?.onClick?.(toAnnotationCallbackPayload(annotation))
+      }
+    />
   );
 };
 

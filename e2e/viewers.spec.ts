@@ -123,26 +123,24 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(virtualRoot.locator(".nsv-sequence-selection")).toHaveCount(0);
 
   await virtualRoot.evaluate((root) => {
-    const firstRow = root.querySelector("[data-virtual-row]");
-    const columns = Math.max(
-      1,
-      firstRow?.querySelectorAll("[data-sequence-position]").length ?? 1,
-    );
-    const rows = Math.ceil(20_000 / columns);
-    const rowHeight = (root as HTMLElement).offsetHeight / rows;
+    const columns = Number((root as HTMLElement).dataset.columnsPerRow);
+    const blocks = Number((root as HTMLElement).dataset.coordinateBlockCount);
+    const blockHeight = (root as HTMLElement).offsetHeight / blocks;
     const scroller = root.closest(
       '[data-testid="virtual-scroll-container"]',
     ) as HTMLElement;
-    scroller.scrollTop = Math.floor(15_000 / columns) * rowHeight;
+    scroller.scrollTop = Math.floor(15_000 / columns) * blockHeight;
   });
   await expect(
-    virtualRoot.locator('[data-sequence-position="15000"]'),
+    virtualRoot.locator(
+      '[data-sequence-row="0"][data-sequence-position="15000"]',
+    ),
   ).toBeVisible();
   await expect(
     virtualRoot.locator(".nsv-sequence-selection").first(),
   ).toBeVisible();
   const [firstRowBox, secondRowBox] = await virtualRoot.evaluate((root) =>
-    Array.from(root.querySelectorAll("[data-virtual-row]"), (row) => {
+    Array.from(root.querySelectorAll('[data-line-kind="sequence"]'), (row) => {
       const rect = row.getBoundingClientRect();
       return { y: rect.y, height: rect.height };
     }).slice(0, 2),
@@ -159,7 +157,7 @@ test("large packed sequences window scrolling while preserving logical selection
   const positionBeforeResize = await virtualRoot.evaluate((root) =>
     Number(
       root
-        .querySelector("[data-sequence-position]")
+        .querySelector('[data-line-kind="sequence"] [data-sequence-position]')
         ?.getAttribute("data-sequence-position"),
     ),
   );
@@ -170,7 +168,7 @@ test("large packed sequences window scrolling while preserving logical selection
   const positionAfterResize = await virtualRoot.evaluate((root) =>
     Number(
       root
-        .querySelector("[data-sequence-position]")
+        .querySelector('[data-line-kind="sequence"] [data-sequence-position]')
         ?.getAttribute("data-sequence-position"),
     ),
   );
@@ -181,9 +179,9 @@ test("large packed sequences window scrolling while preserving logical selection
   const manyRowScroller = page.getByTestId("many-row-scroll-container");
   const manyRowRoot = manyRowScroller.locator('[data-virtualized="true"]');
   await expect(manyRowRoot).toBeVisible();
-  expect(await manyRowRoot.locator("[data-sequence-row]").count()).toBeLessThan(
-    500,
-  );
+  expect(
+    await manyRowRoot.locator('[data-line-kind="sequence"]').count(),
+  ).toBeLessThan(500);
   await manyRowScroller.evaluate((node) => {
     node.scrollTop = node.scrollHeight / 2;
   });
@@ -192,8 +190,8 @@ test("large packed sequences window scrolling while preserving logical selection
       manyRowRoot.evaluate((root) =>
         Number(
           root
-            .querySelector("[data-sequence-row]")
-            ?.getAttribute("data-sequence-row"),
+            .querySelector('[data-line-kind="sequence"]')
+            ?.getAttribute("data-sequence-index"),
         ),
       ),
     )
@@ -204,4 +202,53 @@ test("large packed sequences window scrolling while preserving logical selection
   });
   await expect(viewer.getByText("Virtual feature")).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("React 19 windows a large viewer against page scrolling", async ({
+  page,
+}) => {
+  await page.goto("/react19/?virtual=window");
+  await page.addStyleTag({ url: "/library.css" });
+  await expect(page.locator("html")).toHaveAttribute("data-react", /^19\./);
+  const viewer = page.getByTestId("window-virtual-sequence-viewer");
+  const virtualRoot = viewer.locator('[data-virtualized="true"]');
+  await expect(virtualRoot).toBeVisible();
+  const initialCount = await virtualRoot
+    .locator('[data-line-kind="sequence"] [data-sequence-position]')
+    .count();
+  expect(initialCount).toBeGreaterThan(0);
+  expect(initialCount).toBeLessThan(2_000);
+  const initialPosition = await virtualRoot.evaluate((root) =>
+    Number(
+      root
+        .querySelector('[data-line-kind="sequence"] [data-sequence-position]')
+        ?.getAttribute("data-sequence-position"),
+    ),
+  );
+  await virtualRoot.evaluate((root) => {
+    const blocks = Number((root as HTMLElement).dataset.coordinateBlockCount);
+    window.scrollTo(
+      0,
+      root.getBoundingClientRect().top + window.scrollY + root.clientHeight / 2,
+    );
+    if (blocks < 2) throw new Error("fixture did not wrap");
+  });
+  await expect
+    .poll(() =>
+      virtualRoot.evaluate((root) =>
+        Number(
+          root
+            .querySelector(
+              '[data-line-kind="sequence"] [data-sequence-position]',
+            )
+            ?.getAttribute("data-sequence-position"),
+        ),
+      ),
+    )
+    .toBeGreaterThan(initialPosition + 1_000);
+  expect(
+    await virtualRoot
+      .locator('[data-line-kind="sequence"] [data-sequence-position]')
+      .count(),
+  ).toBeLessThan(2_000);
 });

@@ -46,9 +46,7 @@ const feature: Annotation = {
 };
 
 export function App() {
-  const showVirtualFixture = new URLSearchParams(location.search).has(
-    "virtual",
-  );
+  const virtualMode = new URLSearchParams(location.search).get("virtual");
   const [sequences, updateSequences] = useState([
     "ACGTACGTACGT",
     "ACGTTCGTACG",
@@ -193,8 +191,24 @@ export function App() {
         {JSON.stringify(selection)}
       </output>
       <output data-testid="alignment-updates">{alignmentUpdates}</output>
-      {showVirtualFixture && <VirtualSequenceFixture />}
+      {virtualMode === "1" && <VirtualSequenceFixture />}
+      {virtualMode === "window" && <WindowVirtualSequenceFixture />}
     </main>
+  );
+}
+
+function WindowVirtualSequenceFixture() {
+  return (
+    <section
+      data-testid="window-virtual-sequence-viewer"
+      style={{ overflow: "auto" }}
+    >
+      <SequenceViewer
+        sequences={["ACGT".repeat(5_000)]}
+        hideMetadataBar
+        charClassName={() => "window-virtual-char"}
+      />
+    </section>
   );
 }
 

@@ -579,6 +579,8 @@ export const SeqContent = ({
     setActiveAnnotation,
     setHoveredPosition,
     useVirtualRows,
+    visiblePixels.bottom,
+    visiblePixels.top,
     visibleRows.end,
     visibleRows.start,
   ]);

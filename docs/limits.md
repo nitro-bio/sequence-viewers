@@ -15,6 +15,12 @@ download, mismatch highlighting, variable-length row padding, and annotation
 callbacks continue to use the complete input. Server rendering emits a bounded
 initial window and hydrates into measured browser geometry.
 
+Virtual wrapping assumes every residue keeps the same monospace width and line
+height as the viewer's measurement probe. `charClassName` may change paint
+styles, but changing font size, family, width, line height, margins, or
+transforms can make virtual row geometry inaccurate. Workloads at or below the
+threshold still use ordinary flex wrapping.
+
 Windowing bounds DOM and layout work; it does not bound input memory. Validation
 and annotation construction remain proportional to the total residue count, and
 the viewer retains annotated backing data for every residue so copy and download

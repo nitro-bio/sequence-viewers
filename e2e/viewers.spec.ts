@@ -152,8 +152,8 @@ test("large packed sequences window scrolling while preserving logical selection
   );
   const visibleAnnotation = virtualRoot.locator(".caller-annotation").first();
   await visibleAnnotation.hover();
-  await visibleAnnotation.click();
   await expect(viewer.getByText("Virtual feature")).toBeVisible();
+  await visibleAnnotation.click();
   await expect(page.getByTestId("virtual-annotation-clicks")).toHaveText("1");
 
   const positionBeforeResize = await virtualRoot.evaluate((root) =>

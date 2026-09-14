@@ -1,0 +1,49 @@
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version already committed to main (for example, 2.2.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - name: Check release version
+        run: test "$RELEASE_VERSION" = "$(node -p 'require("./package.json").version')"
+      - name: Install dependencies
+        run: |
+          npm install --global npm@11.19.1 pnpm@11.9.0
+          pnpm install --frozen-lockfile
+      - name: Validate and build
+        run: |
+          pnpm format
+          pnpm lint
+          pnpm test
+          pnpm build:ci
+      - name: Test packed package
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          pnpm test:packed
+      - name: Publish tested tarball
+        run: npm publish ".packed-test/nitro-bio-sequence-viewers-${RELEASE_VERSION}.tgz" --access public --tag latest --ignore-scripts

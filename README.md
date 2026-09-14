@@ -100,5 +100,29 @@ selection and copying, validation recovery, and real self-hosted MAFFT under CSP
 `pnpm dev` starts Storybook. `pnpm benchmark` records production-browser workload
 measurements; see [the benchmark guide](benchmarks/README.md) for reproduction.
 
+## Publishing
+
+The manual [Publish to npm workflow](https://github.com/nitro-bio/sequence-viewers/actions/workflows/publish.yml)
+publishes the version committed to `main`. It builds the package and runs the
+packed integration suite before publishing that same tarball to npm's `latest`
+tag.
+
+A package maintainer must configure [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+once, using npm 11.15 or newer and completing its two-factor authentication prompt:
+
+```sh
+npm trust github @nitro-bio/sequence-viewers --repo nitro-bio/sequence-viewers --file publish.yml --allow-publish
+```
+
+The equivalent npm package settings are GitHub owner `nitro-bio`, repository
+`sequence-viewers`, workflow filename `publish.yml`, no environment, and direct
+`npm publish` permission. The workflow uses GitHub's OIDC identity; no npm token
+secret or per-release npm login is needed.
+
+For each release, apply the changeset and merge the version bump into `main`,
+then select **Actions → Publish to npm → Run workflow**, choose `main`, and enter
+the committed version. The workflow checks that the entered version matches
+`package.json`.
+
 [Report an issue](https://github.com/nitro-bio/sequence-viewers/issues) with the
 package version, framework, browser, and a minimal reproducer.

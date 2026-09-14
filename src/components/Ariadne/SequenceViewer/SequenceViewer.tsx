@@ -46,6 +46,34 @@ import {
 import { clampSlice } from "../CircularViewer/circularUtils";
 import { getMaxSequenceLength } from "../viewerUtils";
 
+type CharClassName = ({
+  base,
+  sequenceIdx,
+}: {
+  base: AnnotatedBase;
+  sequenceIdx: number;
+}) => string;
+
+const defaultCharClassName: CharClassName = () => "nsv:text-sequences-primary";
+
+const toAnnotationCallbackPayload = ({
+  type,
+  direction,
+  start,
+  end,
+  className,
+  text,
+  onClick,
+}: StackedAnnotation): Annotation => ({
+  type,
+  direction,
+  start,
+  end,
+  className,
+  text,
+  onClick,
+});
+
 export const SequenceViewer = ({
   sequences,
   setSequences,
@@ -53,7 +81,7 @@ export const SequenceViewer = ({
   selection,
   setSelection,
   containerClassName,
-  charClassName,
+  charClassName = defaultCharClassName,
   selectionClassName,
   hideMetadataBar,
   hideDownloadButton,
@@ -66,16 +94,10 @@ export const SequenceViewer = ({
   sequences: string[];
   setSequences?: (sequences: string[]) => void;
   annotations?: Annotation[];
-  selection: AriadneSelection | null;
-  setSelection: (selection: AriadneSelection | null) => void;
+  selection?: AriadneSelection | null;
+  setSelection?: (selection: AriadneSelection | null) => void;
   containerClassName?: string;
-  charClassName: ({
-    base,
-    sequenceIdx,
-  }: {
-    base: AnnotatedBase;
-    sequenceIdx: number;
-  }) => string;
+  charClassName?: CharClassName;
   selectionClassName?: string;
   hideMetadataBar?: boolean;
   hideDownloadButton?: boolean;
@@ -86,6 +108,30 @@ export const SequenceViewer = ({
   enableAlignment?: boolean;
   alignmentConfig?: AlignmentConfig;
 }) => {
+  const [internalSelection, setInternalSelection] =
+    useState<AriadneSelection | null>(null);
+  const isSelectionControlled = selection !== undefined;
+  const currentSelection = isSelectionControlled
+    ? selection
+    : internalSelection;
+  const updateSelection = useCallback(
+    (nextSelection: AriadneSelection | null) => {
+      if (!isSelectionControlled) {
+        setInternalSelection(nextSelection);
+      }
+      setSelection?.(nextSelection);
+    },
+    [isSelectionControlled, setSelection],
+  );
+  const applyAlignedSequences = useCallback(
+    (alignedSequences: string[]) => {
+      setSequences?.(alignedSequences);
+      if (!isSelectionControlled) {
+        updateSelection(null);
+      }
+    },
+    [isSelectionControlled, setSequences, updateSelection],
+  );
   const [hoveredPosition, setHoveredPosition] = useState<number | null>(null);
   const [seqIdxToCopy, setSeqIdxToCopy] = useState<number>(0);
   const [activeAnnotation, setActiveAnnotation] =
@@ -104,7 +150,7 @@ export const SequenceViewer = ({
   const validatedAnnotations = validation.annotations;
   const { state: alignState, run: runAlignment } = useMafftEinsi({
     sequences: validatedSequences,
-    onAligned: setSequences,
+    onAligned: setSequences ? applyAlignedSequences : undefined,
     config: alignmentConfig,
     enabled: enableAlignment && !validation.hasUnsafeSequenceData,
   });
@@ -135,11 +181,11 @@ export const SequenceViewer = ({
       maxSequenceLength === 0
         ? null
         : clampSlice({
-            slice: selection,
+            slice: currentSelection,
             firstIdx: 0,
             lastIdx: maxSequenceLength - 1,
           }),
-    [maxSequenceLength, selection],
+    [currentSelection, maxSequenceLength],
   );
   const safeSeqIdxToCopy = Math.max(
     0,
@@ -203,7 +249,7 @@ export const SequenceViewer = ({
       <SeqContent
         annotatedSequences={annotatedSequences}
         selection={displayedSelection}
-        setSelection={setSelection}
+        setSelection={updateSelection}
         setHoveredPosition={setHoveredPosition}
         setActiveAnnotation={setActiveAnnotation}
         stackedAnnotations={stackedAnnotations}
@@ -218,8 +264,8 @@ export const SequenceViewer = ({
     displayedSelection,
     highlightMisalignments,
     selectionClassName,
-    setSelection,
     stackedAnnotations,
+    updateSelection,
   ]);
 
   if (validation.hasUnsafeSequenceData) {
@@ -351,6 +397,19 @@ export const SeqContent = ({
     () => [...stackedAnnotations].sort((a, b) => a.stack - b.stack),
     [stackedAnnotations],
   );
+  const basesBySequenceAndIndex = useMemo(
+    () =>
+      annotatedSequences.map((sequence) => {
+        const basesByIndex = new Map<number, AnnotatedBase>();
+        sequence.forEach((base) => {
+          if (!basesByIndex.has(base.index)) {
+            basesByIndex.set(base.index, base);
+          }
+        });
+        return basesByIndex;
+      }),
+    [annotatedSequences],
+  );
 
   return (
     <>
@@ -362,93 +421,88 @@ export const SeqContent = ({
             )}
             key={`base-${baseIdx}`}
           >
-            {annotatedSequences.map(
-              (sequence: AnnotatedBase[], sequenceIdx) => {
-                const base = sequence.find(
-                  (base: AnnotatedBase) => base.index === baseIdx,
-                ) || { base: " ", annotations: [], index: baseIdx };
+            {annotatedSequences.map((_, sequenceIdx) => {
+              const base = basesBySequenceAndIndex[sequenceIdx].get(
+                baseIdx,
+              ) || { base: " ", annotations: [], index: baseIdx };
 
-                // Check for misalignment with first sequence
-                const firstSeqBase = annotatedSequences[0]?.find(
-                  (b: AnnotatedBase) => b.index === baseIdx,
-                );
-                const isMisaligned =
-                  highlightMisalignments &&
-                  sequenceIdx > 0 &&
-                  firstSeqBase &&
-                  base.base !== " " &&
-                  firstSeqBase.base !== " " &&
-                  base.base !== "-" &&
-                  firstSeqBase.base !== "-" &&
-                  base.base !== firstSeqBase.base;
+              // Check for misalignment with first sequence
+              const firstSeqBase = basesBySequenceAndIndex[0]?.get(baseIdx);
+              const isMisaligned =
+                highlightMisalignments &&
+                sequenceIdx > 0 &&
+                firstSeqBase &&
+                base.base !== " " &&
+                firstSeqBase.base !== " " &&
+                base.base !== "-" &&
+                firstSeqBase.base !== "-" &&
+                base.base !== firstSeqBase.base;
 
-                return (
-                  <div
-                    key={`sequence-${sequenceIdx}-base-${baseIdx}`}
-                    className={classNames(
-                      "nsv:text-center nsv:whitespace-nowrap",
-                    )}
-                    onMouseEnter={() => {
-                      setHoveredPosition(base.index);
-                      // if mouse is down, update selection
-                      if (mouseDown.current && selection) {
-                        setSelection({
-                          ...selection,
-                          end: base.index,
-                        });
-                      }
-                    }}
-                    onMouseLeave={() => setHoveredPosition(null)}
-                    onMouseDown={() => {
-                      mouseDown.current = true;
+              return (
+                <div
+                  key={`sequence-${sequenceIdx}-base-${baseIdx}`}
+                  className={classNames(
+                    "nsv:text-center nsv:whitespace-nowrap",
+                  )}
+                  onMouseEnter={() => {
+                    setHoveredPosition(base.index);
+                    // if mouse is down, update selection
+                    if (mouseDown.current && selection) {
                       setSelection({
-                        start: base.index,
+                        ...selection,
                         end: base.index,
-                        direction: "forward",
                       });
-                    }}
-                    onMouseUp={handleMouseUp}
-                  >
-                    <CharComponent
-                      char={`| ${base.index}`}
-                      index={baseIdx}
-                      charClassName={classNames(
-                        "nsv:absolute nsv:-top-4 nsv:left-0",
-                        "nsv:[border-bottom-width:1px]",
-                        indicesClassName({
-                          base,
-                          sequenceIdx,
-                        }),
-                      )}
-                    />
-                    <CharComponent
-                      char={base.base}
-                      index={baseIdx}
-                      charClassName={classNames(
-                        charClassName({
-                          base,
-                          sequenceIdx,
-                        }),
-                        isMisaligned && "nsv:text-sequences-mismatch!",
-                        ["-", " "].includes(base.base) &&
-                          "nsv:text-sequences-gap!",
-                        baseInSelection({
-                          baseIndex: baseIdx,
-                          selection,
-                          sequenceLength:
-                            annotatedSequences[sequenceIdx].length,
-                        }) &&
-                          base.base !== " " &&
-                          classNames(
-                            "nsv-sequence-selection",
-                            selectionClassName,
-                          ),
-                      )}
-                    />
-                  </div>
-                );
-              },
-            )}
+                    }
+                  }}
+                  onMouseLeave={() => setHoveredPosition(null)}
+                  onMouseDown={() => {
+                    mouseDown.current = true;
+                    setSelection({
+                      start: base.index,
+                      end: base.index,
+                      direction: "forward",
+                    });
+                  }}
+                  onMouseUp={handleMouseUp}
+                >
+                  <CharComponent
+                    char={`| ${base.index}`}
+                    index={baseIdx}
+                    charClassName={classNames(
+                      "nsv:absolute nsv:-top-4 nsv:left-0",
+                      "nsv:[border-bottom-width:1px]",
+                      indicesClassName({
+                        base,
+                        sequenceIdx,
+                      }),
+                    )}
+                  />
+                  <CharComponent
+                    char={base.base}
+                    index={baseIdx}
+                    charClassName={classNames(
+                      charClassName({
+                        base,
+                        sequenceIdx,
+                      }),
+                      isMisaligned && "nsv:text-sequences-mismatch!",
+                      ["-", " "].includes(base.base) &&
+                        "nsv:text-sequences-gap!",
+                      baseInSelection({
+                        baseIndex: baseIdx,
+                        selection,
+                        sequenceLength: annotatedSequences[sequenceIdx].length,
+                      }) &&
+                        base.base !== " " &&
+                        classNames(
+                          "nsv-sequence-selection",
+                          selectionClassName,
+                        ),
+                    )}
+                  />
+                </div>
+              );
+            })}
             <SequenceAnnotation
               annotations={orderedAnnotations}
               index={baseIdx}
@@ -560,6 +614,7 @@ export const SeqMetadataBar = ({
     >
       {!hideDownloadButton && (
         <Button
+          aria-label="Download sequences as FASTA"
           onClick={() => {
             downloadAsFasta({ annotatedSequences });
           }}
@@ -703,11 +758,7 @@ export const SequenceAnnotation = ({
                 annotation.className,
               )}
               onClick={() =>
-                annotation.onClick?.({
-                  start: annotation.start,
-                  end: annotation.end,
-                  diection: annotation.direction,
-                })
+                annotation.onClick?.(toAnnotationCallbackPayload(annotation))
               }
               onMouseEnter={() => setActiveAnnotation(annotation)}
               onMouseLeave={() => setActiveAnnotation(null)}
@@ -774,6 +825,12 @@ export const CopyDisplay = ({
   );
   const selectedSequence = annotatedSequences[safeSeqIdxToCopy];
   const hasSelectedSequence = Boolean(selectedSequence?.length);
+  const getStyleBase = (sequenceIdx: number): AnnotatedBase =>
+    annotatedSequences[sequenceIdx]?.[0] ?? {
+      base: " ",
+      annotations: [],
+      index: 0,
+    };
   return (
     <span className="nsv:flex nsv:items-center nsv:gap-2 nsv:px-1 nsv:py-px">
       <Select
@@ -782,9 +839,10 @@ export const CopyDisplay = ({
         disabled={annotatedSequences.length === 0}
       >
         <SelectTrigger
+          aria-label="Sequence to copy"
           className={classNames(
             charClassName({
-              base: { base: "A", annotations: [], index: 0 },
+              base: getStyleBase(safeSeqIdxToCopy),
               sequenceIdx: safeSeqIdxToCopy,
             }),
             "nsv:text-sequences-foreground nsv:w-fit nsv:rounded-none nsv:[border-right-width:1px]",
@@ -798,7 +856,7 @@ export const CopyDisplay = ({
               key={`sequence-${idx}`}
               value={idx.toString()}
               className={charClassName({
-                base: { base: "A", annotations: [], index: 0 },
+                base: getStyleBase(idx),
                 sequenceIdx: idx,
               })}
             >
@@ -821,7 +879,7 @@ export const CopyDisplay = ({
         label={""}
         disabled={!selection || !hasSelectedSequence}
         buttonClassName={charClassName({
-          base: { base: "A", annotations: [], index: 0 },
+          base: getStyleBase(safeSeqIdxToCopy),
           sequenceIdx: safeSeqIdxToCopy,
         })}
       />

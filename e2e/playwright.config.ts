@@ -11,10 +11,27 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    cwd: resolve(__dirname, ".."),
-    command: "node e2e/serve-packed.mjs",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      cwd: resolve(__dirname, ".."),
+      command: "node e2e/serve-packed.mjs",
+      url: "http://127.0.0.1:4173",
+      reuseExistingServer: false,
+    },
+    {
+      cwd: resolve(__dirname, ".."),
+      command:
+        "npm --prefix .packed-test/examples/vite run preview -- --host 127.0.0.1 --port 4174",
+      url: "http://127.0.0.1:4174",
+      reuseExistingServer: false,
+    },
+    {
+      cwd: resolve(__dirname, ".."),
+      command:
+        "npm --prefix .packed-test/examples/next run start -- --hostname 127.0.0.1 --port 4175",
+      url: "http://127.0.0.1:4175",
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 });

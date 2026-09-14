@@ -1,199 +1,103 @@
 # Nitro Bio Sequence Viewers
 
-![Sequence Viewer](./docs/images/sequence-viewer-header.png)
+React components for DNA, RNA, and protein sequences: residue-level comparison,
+linear and circular annotation maps, selection, FASTA export, and optional
+browser alignment. MIT licensed. Supports React 18.2+ and React 19, with compiled
+CSS and no Tailwind requirement.
 
-![CI](https://github.com/nitro-bio/sequence-viewers/actions/workflows/main.yml/badge.svg)
+[Interactive documentation](https://docs.nitro.bio/SequenceViewer) ·
+[Plain Markdown](https://docs.nitro.bio/SequenceViewer.md) ·
+[Usage guide](docs/usage.md) · [Workloads and accessibility](docs/limits.md)
 
-## As seen on
-
-- [NVIDIA's Build](https://build.nvidia.com/arc/evo2-40b): playground for ai models
-- [Tatta Bio's Gaia](https://gaia.tatta.bio/): embedding based protein search engine
-- [EvoScale's Forge](https://forge.evolutionaryscale.ai/): playground for ESM models
-- [Nitro Bio's Sequences](https://sequences.nitro.bio/): prompt builder for protein models
-
-## React Components for visualizing linear and circular sequences
-
-Requires React and React DOM 18.2+ or 19.x.
+## Start here
 
 ```sh
 npm install @nitro-bio/sequence-viewers
 ```
 
-Import the stylesheet once in your application entry point:
-
-```ts
-import "@nitro-bio/sequence-viewers/styles.css";
-```
-
-Both previous imports, `@nitro-bio/sequence-viewers/dist/nitro.css` and
-`@nitro-bio/sequence-viewers/dist/nitro-sequence-viewers.css`, resolve to the same
-stylesheet for compatibility.
-
-The library stylesheet provides component styles without resetting your host
-page. **Provide your own application reset if your application needs one.**
-Consumers do not need Tailwind installed: this package ships compiled CSS. The
-library builds with Tailwind v4 and targets Safari 16.4+, Chrome 111+, and Firefox
-128+ ([browser requirements](https://tailwindcss.com/docs/compatibility)).
-
-Library utilities and theme variables use the `nsv` prefix. Caller-provided class
-strings are preserved verbatim; define those classes in your own CSS or compile
-them with your application's Tailwind configuration. See the
-[CSS migration guide](docs/issue-80/css-isolation.md) for theming and portal details.
-
-### Sequence Viewer
-
-[Documentation](https://docs.nitro.bio/SequenceViewer/)
-
-### Circular Viewer
-
-[Documentation](https://docs.nitro.bio/CircularViewer/)
-
-### Linear Viewer
-
-[Documentation](https://docs.nitro.bio/LinearViewer/)
-
-## Rendering and validation
-
-`SequenceViewer` accepts omitted annotations or `annotations={[]}` without
-repeating annotation generation on otherwise unchanged input. Empty sequences
-render a local empty state with no active copy, download, or alignment operations.
-Sequence coordinates and established padding behavior are preserved.
-
-All three viewers validate structure and recover by default. Malformed
-annotations are excluded with a local diagnostic; sequence data that cannot be
-displayed safely produces a local placeholder. Rendering remains alphabet-agnostic:
-validation does not replace residues, change case, or shift coordinates.
-
-Use `validationMode="strict"` when rendering failures should throw. The
-`noValidate` prop is deprecated. An explicit `validationMode` always wins;
-otherwise `noValidate={true}` maps to recovery, explicit `false` maps to strict,
-and omission uses recovery. This is structural validation, not an alphabet
-validation bypass. Public parsing helpers retain their documented throwing
-behavior, and exported nucleotide/amino-acid schemas remain available for callers
-who want to validate alphabets separately.
-
-See the [validation migration guide](docs/issue-80/validation.md) for examples and
-regression coverage.
-
-## Optional browser alignment
-
-Alignment is disabled by default. Passing `setSequences` alone does not enable it.
-Opt in explicitly and supply an update callback:
-
 ```tsx
-<SequenceViewer
-  sequences={sequences}
-  setSequences={setSequences}
-  selection={selection}
-  setSelection={setSelection}
-  charClassName={() => "my-residue"}
-  enableAlignment
-  alignmentConfig={{ debug: false }}
-/>
+"use client";
+
+import { SequenceViewer } from "@nitro-bio/sequence-viewers";
+import "@nitro-bio/sequence-viewers/styles.css";
+
+export default function SequenceExample() {
+  return <SequenceViewer sequences={["ATGACCTG", "ATGTCCTG"]} />;
+}
 ```
 
-`alignmentConfig` accepts `urlCDN?: string` and `debug?: boolean` (default `false`).
-An enabled viewer without an update callback shows a disabled alignment action.
-Assets and Aioli initialization remain lazy until an alignment action runs.
-Choose the configuration before the first alignment. Aioli 3.2.1 has no supported
-reconfiguration or worker-termination API; changing an initialized viewer's
-configuration requires remounting it. The viewer reports this locally instead of
-silently allocating another worker.
+This is a complete component. Selection is managed internally and residues have
+default styling. To share selection with your application, pass `selection` and
+`setSelection`. To customize residue classes, pass `charClassName`.
 
-By default, alignment fetches executable JavaScript and WebAssembly tool assets
-from `https://biowasm.com/cdn/v3`: MAFFT **7.520** (`tbfast`, `dvtditr`) and
-Coreutils **8.32** (`cat`), using the locked Aioli **3.2.1** implementation.
-Alignment computes locally in a browser worker; sequence input is supplied to that
-worker rather than uploaded as an alignment service request. Installing Aioli
-from npm does **not** eliminate runtime tool-asset downloads.
+In Next.js App Router, keep the viewer import in a client component; the
+stylesheet can live in the root layout. Complete, runnable examples are included:
 
-For self-hosting, set `alignmentConfig={{ urlCDN: "https://your-host.example/assets" }}`
-and serve the complete documented asset directory. See the
-[alignment migration and self-hosting guide](docs/issue-80/alignment.md) for the
-exact files, browser/CSP/CORS requirements, and error/retry behavior.
+- [Next.js App Router with React 19](examples/next/README.md)
+- [Vite with React 18](examples/vite/README.md)
+
+Both examples are built and exercised against the packed npm artifact in CI.
+
+## Choose a viewer
+
+| Component                                               | Use it for                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [SequenceViewer](https://docs.nitro.bio/SequenceViewer) | Individual residues, annotations, selection, and comparing aligned rows. |
+| [LinearViewer](https://docs.nitro.bio/LinearViewer)     | A linear overview linked to residue selection.                           |
+| [CircularViewer](https://docs.nitro.bio/CircularViewer) | Circular maps and regions that cross the origin.                         |
+
+The residue viewer renders every displayed base; it is not a virtualized genome
+browser. Read the [measurements and operating guidance](docs/limits.md) for
+larger workloads. Strings are rendered without biological alphabet validation;
+coordinate and validation contracts are in the [usage guide](docs/usage.md).
+
+## Optional alignment
+
+Alignment is off by default. Viewing does not download alignment tools. Enable
+it with `enableAlignment` and `setSequences`; the first Align action downloads
+MAFFT JavaScript/WebAssembly and computes locally in a browser worker.
+
+Use the [self-hosting recipe](docs/alignment-self-hosting.md) to prepare assets
+for your own server. The [alignment reference](docs/issue-80/alignment.md) covers
+asset versions, CSP/CORS settings, failure recovery, and worker limits.
+
+## Styling and compatibility
+
+Import `@nitro-bio/sequence-viewers/styles.css` once. The package does not reset
+host styles. Customize `--nsv-color-sequences-*` tokens; caller-provided classes
+are preserved. The supported CSS browser floor is Safari 16.4+, Chrome 111+, and
+Firefox 128+. See the [CSS guide](docs/issue-80/css-isolation.md) for portal themes
+and migration from version 1.
+
+Version 2.1 makes selection and styling props optional and fixes the annotation
+click callback's `direction` field. Existing controlled integrations remain
+supported. See [usage](docs/usage.md) and [validation](docs/issue-80/validation.md).
+
+## Used in
+
+- [NVIDIA Build](https://build.nvidia.com/arc/evo2-40b)
+- [Tatta Bio Gaia](https://gaia.tatta.bio/)
+- [EvolutionaryScale Forge](https://forge.evolutionaryscale.ai/)
+- [Nitro Bio Sequences](https://sequences.nitro.bio/)
 
 ## Development
 
-Most regression coverage lives in four packed-package browser workflows: host CSS
-integration (plain CSS, Tailwind 3 and 4, both load orders), editing/selection/copy
-on React 19, validation recovery, and real self-hosted MAFFT under CSP with retry
-and stale-result handling. Run `pnpm build:ci && pnpm test:packed`; install Chromium
-once with `pnpm exec playwright install chromium`. Unit tests retain the existing
-parser checks and one focused streaming-memoization regression.
+Use pnpm 11.9.0 from the repository root:
 
-### Scripts
-
-This project uses pnpm as the package manager. Here's a list of available scripts:
-
-### Frequently Used in Local dev
-
-- `dev`: Runs Storybook development server on port 6006.
-- `format:fix`: Fixes code formatting issues using Prettier.
-- `lint:fix`: Fixes linting issues automatically.
-- `build`: Lints, builds the project, and generates CSS.
-- `build-css`: Builds and minifies Tailwind CSS.
-- `test`: Runs tests using Vitest.
-
-### CI
-
-- `build:ci`: Builds the project for CI environments.
-- `build-storybook`: Builds Storybook for production.
-- `format`: Checks code formatting using Prettier.
-- `lint`: Runs TypeScript compiler and ESLint.
-
-### Publishing/Library dev
-
-- `publish`: Publishes the package to NPM.
-- `prepublishOnly`: Runs linting, formatting, and build before publishing.
-- `build:watch`: Watches for changes and rebuilds the project.
-- `test:watch`: Runs tests in watch mode.
-
-### Usage
-
-To run a script, use:
-
-```
-pnpm <script-name>
+```sh
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm format
+pnpm test
+pnpm build:ci
+pnpm exec playwright install chromium
+pnpm test:packed
 ```
 
-For example:
+Packed consumer checks cover React 18/19, plain CSS and Tailwind 3/4 integration,
+selection and copying, validation recovery, and real self-hosted MAFFT under CSP.
+`pnpm dev` starts Storybook. `pnpm benchmark` records production-browser workload
+measurements; see [the benchmark guide](benchmarks/README.md) for reproduction.
 
-```
-pnpm dev
-```
-
-This will start the Storybook development server.
-
-## Notable Dependencies
-
-### Frameworks
-
-- React
-
-### Runtime Utilities
-
-- @tanstack/react-query (Data fetching and state management)
-- Zod (Schema validation)
-- @tanstack/react-table (Table component library)
-- React Hook Form (Form handling)
-
-### Buildtime Utilities
-
-- Vite (Build tool and development server)
-- TypeScript (Static typing)
-- ESLint and Prettier (Code linting and formatting)
-- Vitest (Testing framework)
-- Storybook (UI component development and documentation)
-
-### Styling
-
-- Tailwind CSS (Utility-first CSS framework)
-- DaisyUI (Tailwind CSS component library)
-- Radix UI (Accessible UI components)
-- Headless UI (Unstyled, accessible UI components)
-- Hero Icons (SVG icon set)
-
-### Data Viz
-
-- MolStar (Molecular visualization)
-- RDKit (Cheminformatics and machine learning toolkit)
+[Report an issue](https://github.com/nitro-bio/sequence-viewers/issues) with the
+package version, framework, browser, and a minimal reproducer.

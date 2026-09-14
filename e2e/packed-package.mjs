@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
+import { buildPackedExamples } from "../scripts/test-packed-examples.mjs";
 
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,7 +27,11 @@ const [packed] = JSON.parse(
   execFileSync(
     "npm",
     ["pack", "--ignore-scripts", "--json", "--pack-destination", output],
-    { cwd: root, encoding: "utf8" },
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, NPM_CONFIG_CACHE: join(output, "npm-cache") },
+    },
   ),
 );
 execFileSync("tar", [
@@ -139,4 +144,10 @@ for (const major of [18, 19]) {
     },
   });
 }
+await buildPackedExamples({
+  root,
+  outputDirectory: output,
+  tarball: join(output, packed.filename),
+  packageVersion: packed.version,
+});
 console.log(`Packed consumer ready: ${packed.filename}`);

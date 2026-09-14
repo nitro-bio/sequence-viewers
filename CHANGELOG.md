@@ -1,5 +1,16 @@
 # @nitro-bio/sequence-viewers
 
+## 2.1.0
+
+### Minor Changes
+
+- `SequenceViewer` now works with only `sequences`. Selection defaults to internal state and residue styling has a default; existing controlled selection remains supported, including explicit `null`.
+- Annotation click callbacks receive a public annotation with the correctly spelled `direction` field. Metadata actions now have accessible names and use the actual sequence base for custom styling.
+- Residue rendering indexes bases once instead of repeatedly scanning each row. Published workload measurements document remaining DOM costs and interaction limitations.
+- Added complete Next.js/React 19 and Vite/React 18 applications, built and tested against the packed npm artifact.
+- Added a self-hosted alignment asset preparation command, documented CSP setup, and integration coverage.
+- Reworked the README, usage guide, npm discovery metadata, and links to machine-readable documentation.
+
 ## 2.0.0
 
 ### Major Changes

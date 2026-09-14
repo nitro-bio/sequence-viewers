@@ -1,0 +1,65 @@
+:root {
+  color: #e7f5ee;
+  background: #0b1711;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 64px 0;
+}
+
+h1 {
+  max-width: 760px;
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+  letter-spacing: -0.05em;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #72daa5;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.intro {
+  max-width: 680px;
+  margin: 16px 0 32px;
+  color: #a6bcb0;
+  line-height: 1.6;
+}
+
+.viewer-card {
+  overflow-x: auto;
+  padding: 24px;
+  border: 1px solid #294538;
+  border-radius: 16px;
+  color: #16211c;
+  background: #f8fcf9;
+  box-shadow: 0 18px 70px rgb(0 0 0 / 32%);
+}
+
+.viewer-card .gc-residue {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.selection {
+  display: block;
+  margin-top: 16px;
+  color: #a6bcb0;
+  font-size: 0.875rem;
+}

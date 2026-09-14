@@ -3,9 +3,11 @@
 `SequenceViewer` preserves the ordinary wrapped DOM for workloads of 5,000
 residue cells or fewer. Above 5,000 cells (`longest sequence × sequence count`),
 it measures the host's monospace glyph and available width, divides coordinates
-into wrapped rows, and mounts only rows intersecting the viewport plus three
-overscan rows. Within a tall alignment block it also mounts only the visible
-sequence rows plus three rows of overscan.
+into wrapped coordinate blocks, and flattens each block into physical sequence
+and annotation lines. A single TanStack Virtual range mounts only the physical
+lines intersecting the viewport plus three lines of overscan. This keeps both
+long sequences and alignments with many sequence rows bounded without nested
+same-axis virtualizers.
 
 Windowing works with page scrolling and nested scrolling containers. A resize
 recomputes wrapping while anchoring the first visible logical coordinate.
@@ -34,25 +36,27 @@ than its end keeps its existing circular seam semantics.
 
 ## Measured workloads
 
-The published 2.1.0 baseline and unreleased virtualization candidate were both
-measured on the same Apple M4 machine with 16 GiB RAM, React 18.3.1, headless
-Chromium 140.0.7339.16, a 1100×900 viewport, and no CPU throttling. Values are
-medians of three fresh-browser runs, rounded to milliseconds.
+The published 2.1.0 baseline and unreleased TanStack Virtual candidate were
+both measured on the same Apple M4 machine with 16 GiB RAM, React 18.3.1,
+headless Chromium 140.0.7339.16, a 1100×900 viewport, and no CPU throttling.
+Values are medians of three fresh-browser runs, rounded to milliseconds.
 
 | Rows × bases |   Cells | 2.1.0 mount | Candidate mount | 2.1.0 selection | Candidate selection | Candidate DOM |
 | ------------ | ------: | ----------: | --------------: | --------------: | ------------------: | ------------: |
-| 1 × 1,000    |   1,000 |       36 ms |           38 ms |           26 ms |               21 ms |         8,028 |
-| 1 × 10,000   |  10,000 |      234 ms |           72 ms |           73 ms |               43 ms |        15,416 |
-| 10 × 1,000   |  10,000 |      162 ms |          144 ms |           35 ms |               49 ms |        14,297 |
-| 100 × 1,000  | 100,000 |    1,206 ms |          359 ms |          319 ms |               76 ms |        14,570 |
-| 1 × 100,000  | 100,000 |    2,118 ms |           81 ms |          557 ms |               40 ms |        15,416 |
+| 1 × 1,000    |   1,000 |       36 ms |           40 ms |           26 ms |               28 ms |         8,028 |
+| 1 × 10,000   |  10,000 |      234 ms |           68 ms |           73 ms |               25 ms |         7,800 |
+| 10 × 1,000   |  10,000 |      162 ms |           70 ms |           35 ms |               30 ms |         9,002 |
+| 100 × 1,000  | 100,000 |    1,206 ms |           82 ms |          319 ms |               35 ms |         9,372 |
+| 1 × 100,000  | 100,000 |    2,118 ms |           75 ms |          557 ms |               26 ms |         7,800 |
 
 The fixtures contain no annotations. Candidate selection counts only mounted
 cells because offscreen selected cells intentionally have no DOM node. Mount
 excludes network/module loading; selection dispatches a synthetic first-cell
 mouse event and waits for rendering. These measurements are descriptive, not a
 supported maximum or latency guarantee. See the [benchmark guide](../benchmarks/README.md)
-and checked-in raw reports for the exact environment and source state.
+and checked-in raw reports for the exact environment and source state. The
+earlier hand-written virtualization candidate is retained separately so its
+measurements are not attributed to this implementation.
 
 ## Operating guidance
 

@@ -291,11 +291,38 @@ test("React 19 windows a large viewer against page scrolling", async ({
   const viewer = page.getByTestId("window-virtual-sequence-viewer");
   const virtualRoot = viewer.locator('[data-virtualized="true"]');
   await expect(virtualRoot).toBeVisible();
-  const initialCount = await virtualRoot
-    .locator('[data-line-kind="sequence"] [data-sequence-position]')
-    .count();
+  const readWindowBounds = () =>
+    virtualRoot.evaluate((root) => {
+      const sequenceLines = Array.from(
+        root.querySelectorAll<HTMLElement>('[data-line-kind="sequence"]'),
+      );
+      const minimumLineHeight = Math.min(
+        ...sequenceLines
+          .map((line) => line.getBoundingClientRect().height)
+          .filter((height) => height > 0),
+      );
+      const columns = Number((root as HTMLElement).dataset.columnsPerRow);
+      const coordinateBlocks = Number(
+        (root as HTMLElement).dataset.coordinateBlockCount,
+      );
+      const count = root.querySelectorAll(
+        '[data-line-kind="sequence"] [data-sequence-position]',
+      ).length;
+      // One viewport, three TanStack overscan lines on each edge, one pinned
+      // active line, and two boundary lines for partially visible rows.
+      const maximumPhysicalLines =
+        Math.ceil(window.innerHeight / minimumLineHeight) + 3 * 2 + 1 + 2;
+      return {
+        count,
+        maximumResidues: maximumPhysicalLines * columns,
+        logicalResidues: coordinateBlocks * columns,
+      };
+    });
+  const initialBounds = await readWindowBounds();
+  const initialCount = initialBounds.count;
   expect(initialCount).toBeGreaterThan(0);
-  expect(initialCount).toBeLessThan(2_000);
+  expect(initialCount).toBeLessThanOrEqual(initialBounds.maximumResidues);
+  expect(initialCount).toBeLessThan(initialBounds.logicalResidues / 5);
   const initialPosition = await virtualRoot.evaluate((root) =>
     Math.max(
       ...Array.from(
@@ -328,9 +355,9 @@ test("React 19 windows a large viewer against page scrolling", async ({
       ),
     )
     .toBeGreaterThan(initialPosition + 1_000);
-  expect(
-    await virtualRoot
-      .locator('[data-line-kind="sequence"] [data-sequence-position]')
-      .count(),
-  ).toBeLessThan(2_000);
+  const scrolledBounds = await readWindowBounds();
+  expect(scrolledBounds.count).toBeLessThanOrEqual(
+    scrolledBounds.maximumResidues,
+  );
+  expect(scrolledBounds.count).toBeLessThan(scrolledBounds.logicalResidues / 5);
 });

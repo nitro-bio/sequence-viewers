@@ -81,10 +81,20 @@ export async function buildPackedExamples({
 
     run(
       "npm",
-      ["install", "--no-package-lock", "--no-audit", "--no-fund"],
+      [
+        "install",
+        "--include=dev",
+        "--no-package-lock",
+        "--no-audit",
+        "--no-fund",
+      ],
       destination,
       { NPM_CONFIG_CACHE: join(outputDirectory, "npm-cache") },
     );
+
+    if (name === "next") {
+      await access(join(destination, "node_modules/@types/node/package.json"));
+    }
 
     const installedManifestPath = join(
       destination,

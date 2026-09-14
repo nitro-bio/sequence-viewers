@@ -36,7 +36,7 @@ than its end keeps its existing circular seam semantics.
 
 ## Measured workloads
 
-The published 2.1.0 baseline and unreleased TanStack Virtual candidate were
+The published 2.1.0 baseline and a 2.2.0 development build (`166da64`) were
 both measured on the same Apple M4 machine with 16 GiB RAM, React 18.3.1,
 headless Chromium 140.0.7339.16, a 1100×900 viewport, and no CPU throttling.
 Values are medians of three fresh-browser runs, rounded to milliseconds.
@@ -49,7 +49,9 @@ Values are medians of three fresh-browser runs, rounded to milliseconds.
 | 100 × 1,000  | 100,000 |    1,206 ms |           82 ms |          319 ms |               35 ms |         9,372 |
 | 1 × 100,000  | 100,000 |    2,118 ms |           75 ms |          557 ms |               26 ms |         7,800 |
 
-The fixtures contain no annotations. Candidate selection counts only mounted
+The candidate measurements predate the final viewport fixes and removal of two
+small-grid DOM wrappers per coordinate. The fixtures contain no annotations.
+Candidate selection counts only mounted
 cells because offscreen selected cells intentionally have no DOM node. Mount
 excludes network/module loading; selection dispatches a synthetic first-cell
 mouse event and waits for rendering. These measurements are descriptive, not a

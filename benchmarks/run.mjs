@@ -44,8 +44,14 @@ const server = await preview({
   preview: { host: "127.0.0.1", port: 4181, strictPort: true },
 });
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const git = (args) =>
+  execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const report = {
   version: pkg.version,
+  source: {
+    commit: git(["rev-parse", "HEAD"]),
+    dirty: Boolean(git(["status", "--porcelain"])),
+  },
   date: new Date().toISOString(),
   environment: {
     os: `${platform()} ${release()}`,
@@ -91,9 +97,12 @@ try {
           await page.locator("#result").textContent(),
         );
         const result = { trial, ...measured, errors };
-        if (measured.selectedCells !== workload.rows)
+        if (
+          measured.selectedCells < 1 ||
+          measured.selectedCells > workload.rows
+        )
           throw new Error(
-            `Expected ${workload.rows} selected cells; saw ${measured.selectedCells}`,
+            `Expected a bounded visible selection between 1 and ${workload.rows} cells; saw ${measured.selectedCells}`,
           );
         report.trials.push(result);
         console.log(JSON.stringify(result));

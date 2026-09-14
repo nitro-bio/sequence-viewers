@@ -1,7 +1,7 @@
 import genbankParser, { ParsedGenbank } from "genbank-parser";
 import { genbankToAnnotatedSequence } from "./genbankUtils";
 import { z } from "zod";
-import { annotatedSequenceSchema, stackedAnnotationSchema } from "./schemas";
+import { stackedAnnotationSchema } from "./schemas";
 import type {
   AnnotatedSequence,
   Annotation,
@@ -59,55 +59,73 @@ export const getAnnotatedSequence = ({
   const stackedAnnotationsResult = z
     .array(stackedAnnotationSchema)
     .safeParse(stackedAnnotations);
-  let safeStackedAnnotations = stackedAnnotations;
+  let safeStackedAnnotations: StackedAnnotation[] = [];
   if (!stackedAnnotationsResult.success) {
     if (mode === "strict") {
       throw new Error(stackedAnnotationsResult.error.message);
     }
     safeStackedAnnotations = Array.isArray(stackedAnnotations)
-      ? stackedAnnotations.filter(
-          (annotation) => stackedAnnotationSchema.safeParse(annotation).success,
-        )
+      ? stackedAnnotations.flatMap((annotation) => {
+          const result = stackedAnnotationSchema.safeParse(annotation);
+          return result.success ? [result.data] : [];
+        })
       : [];
+  } else {
+    safeStackedAnnotations = stackedAnnotationsResult.data;
   }
 
-  /* loop through sequence finding all annoatations that apply to each base */
-  const mapFn = (base: string, idx: number) => {
-    const annotationsForBase = safeStackedAnnotations.filter((annotation) => {
-      // if the annotation spans the seam of the plasmid
-      if (annotation.start > annotation.end) {
-        const isBetweenAnnotationStartAndEndofSequence =
-          idx >= annotation.start && idx <= sequence.length;
-        const isBetweenStartOfSequenceAndAnnotationEnd =
-          idx >= 0 && idx <= annotation.end;
-        return (
-          isBetweenAnnotationStartAndEndofSequence ||
-          isBetweenStartOfSequenceAndAnnotationEnd
-        );
-      } else {
-        // regular case
-        return idx >= annotation.start && idx <= annotation.end;
-      }
-    });
-    return {
-      base,
-      index: idx,
-      annotations: annotationsForBase,
-      complement: getComplement(base),
-    };
-  };
-  const raw = sequence
-    .split("")
-    .map(mapFn)
-    .filter((x) => x.base !== " "); // remove padding
-  const annotatedSequence = annotatedSequenceSchema.safeParse(raw);
-  if (annotatedSequence.success === false) {
-    if (mode === "recover") {
-      return [];
+  // Build interval events once instead of scanning every annotation for every
+  // residue. The active list stays in caller order, matching Array#filter.
+  const starts = new Map<number, number[]>();
+  const stops = new Map<number, number[]>();
+  const addEvent = (
+    events: Map<number, number[]>,
+    at: number,
+    index: number,
+  ) => {
+    const existing = events.get(at);
+    if (existing) {
+      existing.push(index);
+    } else {
+      events.set(at, [index]);
     }
-    throw new Error(annotatedSequence.error.message);
+  };
+  const addInterval = (start: number, end: number, annotationIndex: number) => {
+    const first = Math.max(0, Math.ceil(start));
+    const last = Math.min(sequence.length - 1, Math.floor(end));
+    if (first > last) return;
+    addEvent(starts, first, annotationIndex);
+    addEvent(stops, last + 1, annotationIndex);
+  };
+  safeStackedAnnotations.forEach((annotation, index) => {
+    if (annotation.start > annotation.end) {
+      addInterval(0, annotation.end, index);
+      addInterval(annotation.start, sequence.length - 1, index);
+    } else {
+      addInterval(annotation.start, annotation.end, index);
+    }
+  });
+
+  const active = new Set<number>();
+  const annotatedSequence: AnnotatedSequence = [];
+  for (let index = 0; index < sequence.length; index += 1) {
+    stops
+      .get(index)
+      ?.forEach((annotationIndex) => active.delete(annotationIndex));
+    starts
+      .get(index)
+      ?.forEach((annotationIndex) => active.add(annotationIndex));
+    const base = sequence[index];
+    if (base === " ") continue;
+    annotatedSequence.push({
+      base,
+      index,
+      annotations: [...active]
+        .sort((a, b) => a - b)
+        .map((annotationIndex) => safeStackedAnnotations[annotationIndex]),
+    });
   }
-  return annotatedSequence.data;
+  return annotatedSequence;
 };
 
 interface Stackable {

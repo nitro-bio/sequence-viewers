@@ -34,6 +34,7 @@ function Workload() {
         selectionMs: performance.now() - interactionStart,
         selectedCells: document.querySelectorAll(".nsv-sequence-selection")
           .length,
+        renderedCells: cells.length,
         domElements: document.querySelectorAll("*").length,
       };
       document.getElementById("result")!.textContent = JSON.stringify(result);

@@ -89,7 +89,7 @@ See [self-hosted alignment](alignment-self-hosting.md) for asset setup and the
 
 See [workloads and accessibility](limits.md) before using long sequences, large
 alignments, or keyboard-only workflows. There is no enforced sequence length
-limit, and the residue viewer does not virtualize its DOM. Successful validation
+limit, and the residue viewer windows large DOM workloads. Successful validation
 means the data has a safe shape, not that any size will render responsively.
 Validation recovers locally by default; use `validationMode="strict"` for errors
 handled by your application boundary.

@@ -1,5 +1,13 @@
 # @nitro-bio/sequence-viewers
 
+## 2.2.0
+
+### Minor Changes
+
+- Virtualize large `SequenceViewer` grids while preserving full-coordinate selection, annotation interactions, copy, and download.
+- Refresh scrolling and row measurements when hidden viewers appear, containers resize, or font metrics change. Resizing an offscreen viewer preserves the page position.
+- Build residue annotations from interval events while preserving annotation order and callback payloads.
+
 ## 2.1.0
 
 ### Minor Changes

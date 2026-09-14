@@ -46,9 +46,10 @@ Both examples are built and exercised against the packed npm artifact in CI.
 | [LinearViewer](https://docs.nitro.bio/LinearViewer)     | A linear overview linked to residue selection.                           |
 | [CircularViewer](https://docs.nitro.bio/CircularViewer) | Circular maps and regions that cross the origin.                         |
 
-The residue viewer renders every displayed base; it is not a virtualized genome
-browser. Read the [measurements and operating guidance](docs/limits.md) for
-larger workloads. Strings are rendered without biological alphabet validation;
+The residue viewer automatically windows large inputs while keeping full
+selection, copy, download, mismatch, and annotation behavior. Read the
+[measurements and operating guidance](docs/limits.md) for the exact threshold
+and remaining memory costs. Strings are rendered without biological alphabet validation;
 coordinate and validation contracts are in the [usage guide](docs/usage.md).
 
 ## Optional alignment

@@ -46,6 +46,7 @@ const feature: Annotation = {
 };
 
 export function App() {
+  const virtualMode = new URLSearchParams(location.search).get("virtual");
   const [sequences, updateSequences] = useState([
     "ACGTACGTACGT",
     "ACGTTCGTACG",
@@ -190,7 +191,118 @@ export function App() {
         {JSON.stringify(selection)}
       </output>
       <output data-testid="alignment-updates">{alignmentUpdates}</output>
+      {virtualMode === "1" && <VirtualSequenceFixture />}
+      {virtualMode === "window" && <WindowVirtualSequenceFixture />}
     </main>
+  );
+}
+
+function WindowVirtualSequenceFixture() {
+  const [narrow, setNarrow] = useState(false);
+  return (
+    <>
+      <button
+        data-testid="resize-window-viewer"
+        style={{ position: "fixed", right: 8, top: 8, zIndex: 100 }}
+        onClick={() => setNarrow((value) => !value)}
+      >
+        Resize window viewer
+      </button>
+      <section
+        data-testid="window-virtual-sequence-viewer"
+        style={{
+          marginTop: 1_200,
+          overflow: "auto",
+          width: narrow ? 520 : 900,
+        }}
+      >
+        <SequenceViewer
+          sequences={["ACGT".repeat(5_000)]}
+          hideMetadataBar
+          charClassName={() => "window-virtual-char"}
+        />
+      </section>
+    </>
+  );
+}
+
+function VirtualSequenceFixture() {
+  const [selection, setSelection] = useState<AriadneSelection | null>({
+    start: 0,
+    end: 0,
+    direction: "forward",
+  });
+  const [revealed, setRevealed] = useState(false);
+  const [constrained, setConstrained] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const [tallRows, setTallRows] = useState(false);
+  const [annotationClicks, setAnnotationClicks] = useState(0);
+  const sequence = "ACGT".repeat(5_000);
+  return (
+    <section
+      data-testid="virtual-sequence-viewer"
+      style={{ lineHeight: tallRows ? "40px" : undefined }}
+    >
+      <button onClick={() => setRevealed(true)}>Reveal viewer</button>
+      <button onClick={() => setConstrained(true)}>Constrain viewer</button>
+      <button
+        onClick={() =>
+          setSelection({
+            start: 15_000,
+            end: 15_010,
+            direction: "forward",
+          })
+        }
+      >
+        Select offscreen range
+      </button>
+      <button onClick={() => setNarrow((value) => !value)}>
+        Resize viewer
+      </button>
+      <button onClick={() => setTallRows(true)}>Increase row height</button>
+      <div
+        data-testid="virtual-scroll-container"
+        style={{
+          display: revealed ? "block" : "none",
+          height: constrained ? 360 : "auto",
+          overflow: "auto",
+          width: narrow ? 520 : 900,
+        }}
+      >
+        <SequenceViewer
+          sequences={[sequence, sequence]}
+          annotations={[
+            {
+              ...feature,
+              start: 15_000,
+              end: 15_010,
+              text: "Virtual feature",
+              onClick: () => setAnnotationClicks((count) => count + 1),
+            },
+          ]}
+          selection={selection}
+          setSelection={setSelection}
+          charClassName={() => "virtual-char"}
+        />
+      </div>
+      <output data-testid="virtual-selection">
+        {JSON.stringify(selection)}
+      </output>
+      <output data-testid="virtual-annotation-clicks">
+        {annotationClicks}
+      </output>
+      <div
+        data-testid="many-row-scroll-container"
+        style={{ height: 240, overflow: "auto", width: 900 }}
+      >
+        <SequenceViewer
+          sequences={Array.from({ length: 10_000 }, (_, index) =>
+            index === 5_000 ? "TTTTTTTT" : "ACGTACGT",
+          )}
+          hideMetadataBar
+        />
+      </div>
+    </section>
   );
 }
 

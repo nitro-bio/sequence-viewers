@@ -1,0 +1,202 @@
+{
+  "version": "2.1.0",
+  "source": {
+    "commit": "166da647141207ca420edd1352fc942a9b05a664",
+    "dirty": false,
+    "label": "unreleased TanStack Virtual candidate"
+  },
+  "date": "2026-09-14T11:55:59.098Z",
+  "environment": {
+    "os": "darwin 25.6.0",
+    "cpu": "Apple M4",
+    "logicalCpus": 10,
+    "ramGiB": 16,
+    "node": "v26.8.2",
+    "viewport": "1100x900",
+    "react": "18.3.1",
+    "cpuThrottling": "none",
+    "browser": "140.0.7339.16"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 37,
+      "selectionMs": 27.5,
+      "selectedCells": 1,
+      "renderedCells": 1000,
+      "domElements": 8028,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 39.5,
+      "selectionMs": 35.10000002384186,
+      "selectedCells": 1,
+      "renderedCells": 1000,
+      "domElements": 8028,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 1000,
+      "cells": 1000,
+      "mountMs": 39.5,
+      "selectionMs": 25.799999952316284,
+      "selectedCells": 1,
+      "renderedCells": 1000,
+      "domElements": 8028,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 67.09999990463257,
+      "selectionMs": 24.800000071525574,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 68.19999992847443,
+      "selectionMs": 20.100000023841858,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 10000,
+      "cells": 10000,
+      "mountMs": 67.60000002384186,
+      "selectionMs": 29.899999976158142,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 69.90000009536743,
+      "selectionMs": 30.100000023841858,
+      "selectedCells": 10,
+      "renderedCells": 4048,
+      "domElements": 9002,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 69.79999995231628,
+      "selectionMs": 25.299999952316284,
+      "selectedCells": 10,
+      "renderedCells": 4048,
+      "domElements": 9002,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 10,
+      "length": 1000,
+      "cells": 10000,
+      "mountMs": 70.19999992847443,
+      "selectionMs": 35.5,
+      "selectedCells": 10,
+      "renderedCells": 4048,
+      "domElements": 9002,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 82.10000002384186,
+      "selectionMs": 35.59999990463257,
+      "selectedCells": 50,
+      "renderedCells": 4600,
+      "domElements": 9372,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 80.60000002384186,
+      "selectionMs": 35.200000047683716,
+      "selectedCells": 50,
+      "renderedCells": 4600,
+      "domElements": 9372,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 100,
+      "length": 1000,
+      "cells": 100000,
+      "mountMs": 81.79999995231628,
+      "selectionMs": 33.60000002384186,
+      "selectedCells": 50,
+      "renderedCells": 4600,
+      "domElements": 9372,
+      "errors": []
+    },
+    {
+      "trial": 1,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 75,
+      "selectionMs": 26.100000023841858,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    },
+    {
+      "trial": 2,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 76,
+      "selectionMs": 31.899999976158142,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    },
+    {
+      "trial": 3,
+      "rows": 1,
+      "length": 100000,
+      "cells": 100000,
+      "mountMs": 75.29999995231628,
+      "selectionMs": 19.899999976158142,
+      "selectedCells": 1,
+      "renderedCells": 1932,
+      "domElements": 7800,
+      "errors": []
+    }
+  ]
+}

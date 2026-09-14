@@ -1,5 +1,67 @@
 import { expect, test } from "@playwright/test";
 
+test("packed viewer supports scoped keyboard focus, selection, copying, and annotations", async ({
+  page,
+  context,
+}, testInfo) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/");
+  await page.addStyleTag({ url: "/library.css" });
+  await page.locator("body").click({ position: { x: 1, y: 1 } });
+
+  const surface = page
+    .getByTestId("sequence-viewer")
+    .getByRole("listbox", { name: /Sequence residues/ });
+  for (let attempts = 0; attempts < 20; attempts += 1) {
+    await page.keyboard.press("Tab");
+    if (await surface.evaluate((node) => node === document.activeElement))
+      break;
+  }
+  await expect(surface).toBeFocused();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect(page.getByTestId("selection-output")).toContainText(
+    '"direction":"reverse"',
+  );
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("a");
+  await expect(
+    page
+      .getByTestId("sequence-viewer")
+      .getByRole("status")
+      .filter({ hasText: "CDS annotation, Example feature" }),
+  ).toBeVisible();
+
+  const hostInput = page.getByTestId("host-input");
+  await hostInput.focus();
+  await hostInput.selectText();
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("Host input");
+
+  const secondary = page
+    .getByTestId("secondary-sequence-viewer")
+    .getByRole("listbox");
+  await secondary.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("T");
+
+  await surface.focus();
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("GT");
+  await page.screenshot({
+    path: testInfo.outputPath("keyboard-selection.png"),
+  });
+});
+
 test("React 19: select, copy, edit, and empty the packed viewers", async ({
   page,
   context,
@@ -73,9 +135,11 @@ test("malformed annotations recover locally, with strict errors handled by the h
   await page.getByLabel("Invalid annotations").check();
   for (const name of ["sequence", "linear", "circular"]) {
     const viewer = page.getByTestId(`${name}-viewer`);
-    await expect(viewer.getByRole("status")).toContainText(
-      "Some annotations were not displayed",
-    );
+    await expect(
+      viewer
+        .getByRole("status")
+        .filter({ hasText: "Some annotations were not displayed" }),
+    ).toBeVisible();
     await expect(viewer.locator(".caller-annotation").first()).toBeVisible();
     await expect(viewer).not.toContainText("Invalid feature");
   }
@@ -83,7 +147,10 @@ test("malformed annotations recover locally, with strict errors handled by the h
     page.getByTestId("sequence-viewer").locator(".caller-char").first(),
   ).toBeVisible();
   const circular = page.getByTestId("circular-viewer");
-  const diagnostic = await circular.getByRole("status").boundingBox();
+  const diagnostic = await circular
+    .getByRole("status")
+    .filter({ hasText: "Some annotations were not displayed" })
+    .boundingBox();
   const diagram = await circular.locator("svg").first().boundingBox();
   expect(diagram!.y).toBeGreaterThanOrEqual(diagnostic!.y + diagnostic!.height);
 
@@ -139,6 +206,16 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(
     virtualRoot.locator(".nsv-sequence-selection").first(),
   ).toBeVisible();
+  const deepResidue = virtualRoot.locator(
+    '[data-sequence-row="0"][data-sequence-position="15000"]',
+  );
+  const scrollTopBeforeResidueClick = await scrollContainer.evaluate(
+    (node) => node.scrollTop,
+  );
+  await deepResidue.click();
+  await expect
+    .poll(() => scrollContainer.evaluate((node) => node.scrollTop))
+    .toBe(scrollTopBeforeResidueClick);
   const [firstRowBox, secondRowBox] = await virtualRoot.evaluate((root) =>
     Array.from(root.querySelectorAll('[data-line-kind="sequence"]'), (row) => {
       const rect = row.getBoundingClientRect();
@@ -188,10 +265,11 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect
     .poll(() =>
       manyRowRoot.evaluate((root) =>
-        Number(
-          root
-            .querySelector('[data-line-kind="sequence"]')
-            ?.getAttribute("data-sequence-index"),
+        Math.max(
+          ...Array.from(
+            root.querySelectorAll('[data-line-kind="sequence"]'),
+            (line) => Number(line.getAttribute("data-sequence-index")),
+          ),
         ),
       ),
     )
@@ -213,16 +291,46 @@ test("React 19 windows a large viewer against page scrolling", async ({
   const viewer = page.getByTestId("window-virtual-sequence-viewer");
   const virtualRoot = viewer.locator('[data-virtualized="true"]');
   await expect(virtualRoot).toBeVisible();
-  const initialCount = await virtualRoot
-    .locator('[data-line-kind="sequence"] [data-sequence-position]')
-    .count();
+  const readWindowBounds = () =>
+    virtualRoot.evaluate((root) => {
+      const sequenceLines = Array.from(
+        root.querySelectorAll<HTMLElement>('[data-line-kind="sequence"]'),
+      );
+      const minimumLineHeight = Math.min(
+        ...sequenceLines
+          .map((line) => line.getBoundingClientRect().height)
+          .filter((height) => height > 0),
+      );
+      const columns = Number((root as HTMLElement).dataset.columnsPerRow);
+      const coordinateBlocks = Number(
+        (root as HTMLElement).dataset.coordinateBlockCount,
+      );
+      const count = root.querySelectorAll(
+        '[data-line-kind="sequence"] [data-sequence-position]',
+      ).length;
+      // One viewport, three TanStack overscan lines on each edge, one pinned
+      // active line, and two boundary lines for partially visible rows.
+      const maximumPhysicalLines =
+        Math.ceil(window.innerHeight / minimumLineHeight) + 3 * 2 + 1 + 2;
+      return {
+        count,
+        maximumResidues: maximumPhysicalLines * columns,
+        logicalResidues: coordinateBlocks * columns,
+      };
+    });
+  const initialBounds = await readWindowBounds();
+  const initialCount = initialBounds.count;
   expect(initialCount).toBeGreaterThan(0);
-  expect(initialCount).toBeLessThan(2_000);
+  expect(initialCount).toBeLessThanOrEqual(initialBounds.maximumResidues);
+  expect(initialCount).toBeLessThan(initialBounds.logicalResidues / 5);
   const initialPosition = await virtualRoot.evaluate((root) =>
-    Number(
-      root
-        .querySelector('[data-line-kind="sequence"] [data-sequence-position]')
-        ?.getAttribute("data-sequence-position"),
+    Math.max(
+      ...Array.from(
+        root.querySelectorAll(
+          '[data-line-kind="sequence"] [data-sequence-position]',
+        ),
+        (residue) => Number(residue.getAttribute("data-sequence-position")),
+      ),
     ),
   );
   await virtualRoot.evaluate((root) => {
@@ -236,19 +344,20 @@ test("React 19 windows a large viewer against page scrolling", async ({
   await expect
     .poll(() =>
       virtualRoot.evaluate((root) =>
-        Number(
-          root
-            .querySelector(
+        Math.max(
+          ...Array.from(
+            root.querySelectorAll(
               '[data-line-kind="sequence"] [data-sequence-position]',
-            )
-            ?.getAttribute("data-sequence-position"),
+            ),
+            (residue) => Number(residue.getAttribute("data-sequence-position")),
+          ),
         ),
       ),
     )
     .toBeGreaterThan(initialPosition + 1_000);
-  expect(
-    await virtualRoot
-      .locator('[data-line-kind="sequence"] [data-sequence-position]')
-      .count(),
-  ).toBeLessThan(2_000);
+  const scrolledBounds = await readWindowBounds();
+  expect(scrolledBounds.count).toBeLessThanOrEqual(
+    scrolledBounds.maximumResidues,
+  );
+  expect(scrolledBounds.count).toBeLessThan(scrolledBounds.logicalResidues / 5);
 });

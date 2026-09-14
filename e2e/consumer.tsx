@@ -175,6 +175,9 @@ export function App() {
           </ErrorBoundary>
         </section>
       ))}
+      <section data-testid="secondary-sequence-viewer">
+        <SequenceViewer sequences={["TG"]} hideMetadataBar />
+      </section>
       <section data-testid="standalone-ticks">
         <ReferenceTicks sequence={annotatedSequence} />
       </section>

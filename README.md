@@ -29,6 +29,10 @@ export default function SequenceExample() {
 This is a complete component. Selection is managed internally and residues have
 default styling. To share selection with your application, pass `selection` and
 `setSelection`. To customize residue classes, pass `charClassName`.
+The residue surface is one keyboard tab stop: use arrow keys to move, Shift with
+an arrow to select a range, Space or Enter to select one residue, and Escape to
+clear. Press A to inspect overlapping annotations and Shift+A to activate the
+described annotation. Coordinates announced by the viewer are zero-based.
 
 In Next.js App Router, keep the viewer import in a client component; the
 stylesheet can live in the root layout. Complete, runnable examples are included:
@@ -96,7 +100,8 @@ pnpm test:packed
 ```
 
 Packed consumer checks cover React 18/19, plain CSS and Tailwind 3/4 integration,
-selection and copying, validation recovery, and real self-hosted MAFFT under CSP.
+pointer and keyboard selection, copying, validation recovery, and real
+self-hosted MAFFT under CSP.
 `pnpm dev` starts Storybook. `pnpm benchmark` records production-browser workload
 measurements; see [the benchmark guide](benchmarks/README.md) for reproduction.
 

@@ -50,6 +50,13 @@ import {
 } from "../validation";
 import { clampSlice } from "../CircularViewer/circularUtils";
 import { getMaxSequenceLength } from "../viewerUtils";
+import { usePositionLabelLayout } from "./usePositionLabelLayout";
+import { PositionLabelSlot, PositionRulerRow } from "./PositionRulerRow";
+import {
+  isMinimalPositionLabelRenderer,
+  isCustomPositionLabelRenderer,
+  type PositionLabelRenderer,
+} from "./positionLabelRenderer";
 
 type CharClassName = ({
   base,
@@ -95,6 +102,8 @@ export const SequenceViewer = ({
   highlightMisalignments,
   enableAlignment = false,
   alignmentConfig,
+  positionLabels,
+  positionLabelRenderer,
 }: {
   sequences: string[];
   setSequences?: (sequences: string[]) => void;
@@ -112,6 +121,15 @@ export const SequenceViewer = ({
   highlightMisalignments?: boolean;
   enableAlignment?: boolean;
   alignmentConfig?: AlignmentConfig;
+  /**
+   * Display labels for aligned columns, replacing the default index ruler.
+   * Null or missing entries are blank; extra entries are ignored. Selection
+   * and annotation coordinates remain zero-based column indices. Update labels
+   * alongside sequences when alignment changes the columns.
+   */
+  positionLabels?: readonly (string | null)[];
+  /** Minimal by default; a packaged renderer or a React component for each nonblank label. */
+  positionLabelRenderer?: PositionLabelRenderer;
 }) => {
   const [internalSelection, setInternalSelection] =
     useState<AriadneSelection | null>(null);
@@ -199,6 +217,27 @@ export const SequenceViewer = ({
   const hasSequenceData = annotatedSequences.some(
     (annotatedSequence) => annotatedSequence.length > 0,
   );
+  const contentRef = useRef<HTMLDivElement>(null);
+  const customPositionLabels = isCustomPositionLabelRenderer(
+    positionLabelRenderer,
+  );
+  const labelHoveredPosition = customPositionLabels ? hoveredPosition : null;
+  const rulerLabels = useMemo(
+    () =>
+      positionLabels ??
+      (positionLabelRenderer === undefined
+        ? undefined
+        : Array.from({ length: maxSequenceLength }, (_, index) =>
+            index % 10 === 0 ? String(index) : null,
+          )),
+    [maxSequenceLength, positionLabels, positionLabelRenderer],
+  );
+  usePositionLabelLayout(
+    contentRef,
+    rulerLabels,
+    annotatedSequences,
+    positionLabelRenderer,
+  );
 
   useEffect(
     function resetStaleMetadata() {
@@ -261,6 +300,9 @@ export const SequenceViewer = ({
         charClassName={charClassName}
         selectionClassName={selectionClassName}
         highlightMisalignments={highlightMisalignments}
+        positionLabels={rulerLabels}
+        positionLabelRenderer={positionLabelRenderer}
+        hoveredPosition={labelHoveredPosition}
       />
     );
   }, [
@@ -268,6 +310,9 @@ export const SequenceViewer = ({
     charClassName,
     displayedSelection,
     highlightMisalignments,
+    rulerLabels,
+    positionLabelRenderer,
+    labelHoveredPosition,
     selectionClassName,
     stackedAnnotations,
     updateSelection,
@@ -319,7 +364,21 @@ export const SequenceViewer = ({
           alignState={alignState}
         />
       )}
-      <div className="nsv:flex nsv:w-full nsv:flex-wrap nsv:px-2">
+      <div
+        ref={contentRef}
+        className={classNames(
+          "nsv:flex nsv:w-full nsv:flex-wrap nsv:px-2",
+          rulerLabels !== undefined && "nsv-position-content",
+        )}
+        data-position-label-preset={
+          rulerLabels === undefined
+            ? undefined
+            : isMinimalPositionLabelRenderer(positionLabelRenderer)
+              ? "minimal"
+              : "adaptive"
+        }
+        data-position-label-custom={customPositionLabels ? "true" : undefined}
+      >
         {memoizedSeqContent}
       </div>
     </div>
@@ -335,6 +394,9 @@ export const SeqContent = ({
   charClassName,
   selectionClassName,
   highlightMisalignments,
+  positionLabels,
+  positionLabelRenderer,
+  hoveredPosition,
 }: {
   annotatedSequences: AnnotatedBase[][];
   selection: AriadneSelection | null;
@@ -351,6 +413,9 @@ export const SeqContent = ({
   }) => string;
   selectionClassName?: string;
   highlightMisalignments?: boolean;
+  positionLabels?: readonly (string | null)[];
+  positionLabelRenderer?: PositionLabelRenderer;
+  hoveredPosition?: number | null;
 }) => {
   const VIRTUAL_CELL_THRESHOLD = 5_000;
   const mouseDown = useRef(false);
@@ -496,11 +561,26 @@ export const SeqContent = ({
     (lineIndex: number) => {
       const lineInBlock = lineIndex % Math.max(linesPerBlock, 1);
       if (lineInBlock < annotatedSequences.length) {
-        return virtualMetrics.residueHeight + (lineInBlock === 0 ? 16 : 0);
+        return (
+          virtualMetrics.residueHeight +
+          (lineInBlock === 0
+            ? 16 +
+              (positionLabels !== undefined &&
+              !isMinimalPositionLabelRenderer(positionLabelRenderer)
+                ? 26
+                : 0)
+            : 0)
+        );
       }
       return 12;
     },
-    [annotatedSequences.length, linesPerBlock, virtualMetrics.residueHeight],
+    [
+      annotatedSequences.length,
+      linesPerBlock,
+      virtualMetrics.residueHeight,
+      positionLabels,
+      positionLabelRenderer,
+    ],
   );
   const elementVirtualizer = useVirtualizer({
     count: virtualLineCount,
@@ -631,17 +711,18 @@ export const SeqContent = ({
         }}
         onMouseUp={handleMouseUp}
       >
-        {(virtualWidth === undefined || sequenceIdx === 0) && (
-          <CharComponent
-            char={`| ${base.index}`}
-            index={baseIdx}
-            charClassName={classNames(
-              "nsv:absolute nsv:-top-4 nsv:left-0",
-              "nsv:[border-bottom-width:1px]",
-              indicesClassName({ base, sequenceIdx }),
-            )}
-          />
-        )}
+        {positionLabels === undefined &&
+          (virtualWidth === undefined || sequenceIdx === 0) && (
+            <CharComponent
+              char={`| ${base.index}`}
+              index={baseIdx}
+              charClassName={classNames(
+                "nsv:absolute nsv:-top-4 nsv:left-0",
+                "nsv:[border-bottom-width:1px]",
+                indicesClassName({ base, sequenceIdx }),
+              )}
+            />
+          )}
         <CharComponent
           char={base.base}
           index={baseIdx}
@@ -667,7 +748,21 @@ export const SeqContent = ({
       className="nsv:relative nsv:mt-4 nsv:flex nsv:flex-col nsv:justify-between"
       key={`base-${baseIdx}`}
       data-sequence-position={baseIdx}
+      data-sequence-column={baseIdx}
     >
+      {positionLabels !== undefined && (
+        <PositionLabelSlot
+          label={positionLabels[baseIdx]}
+          columnIndex={baseIdx}
+          renderer={positionLabelRenderer}
+          isHovered={hoveredPosition === baseIdx}
+          isSelected={baseInSelection({
+            baseIndex: baseIdx,
+            selection,
+            sequenceLength: maxSequenceLength,
+          })}
+        />
+      )}
       {annotatedSequences.map((_, sequenceIdx) =>
         renderResidue(baseIdx, sequenceIdx),
       )}
@@ -711,13 +806,19 @@ export const SeqContent = ({
           const isSequenceLine = lineInBlock < annotatedSequences.length;
           const sequenceIdx = lineInBlock;
           const annotationStack = lineInBlock - annotatedSequences.length;
+          const hasRuler =
+            isSequenceLine && sequenceIdx === 0 && positionLabels !== undefined;
           return (
             <div
               key={virtualItem.key}
-              className="nsv:absolute nsv:left-0 nsv:flex nsv:w-full"
+              ref={hasRuler ? virtualizer.measureElement : undefined}
+              className={classNames(
+                "nsv:absolute nsv:left-0 nsv:flex nsv:w-full",
+                hasRuler && "nsv:flex-col",
+              )}
               style={{
                 top: 0,
-                height: virtualItem.size,
+                height: hasRuler ? undefined : virtualItem.size,
                 paddingTop: isSequenceLine && sequenceIdx === 0 ? 16 : 0,
                 transform: `translateY(${virtualItem.start - scrollMargin}px)`,
               }}
@@ -727,28 +828,53 @@ export const SeqContent = ({
               data-line-kind={isSequenceLine ? "sequence" : "annotation"}
               data-sequence-index={isSequenceLine ? sequenceIdx : undefined}
             >
-              {Array.from({ length: last - first }, (_, offset) => {
-                const baseIdx = first + offset;
-                if (!isSequenceLine) {
-                  return (
-                    <SequenceAnnotationLine
-                      key={`annotation-${annotationStack}-${baseIdx}`}
-                      annotations={orderedAnnotations}
-                      index={baseIdx}
-                      stack={annotationStack}
-                      setHoveredPosition={setHoveredPosition}
-                      setActiveAnnotation={setActiveAnnotation}
-                      maxSequenceLength={maxSequenceLength}
-                      width={virtualMetrics.columnWidth}
-                    />
+              {hasRuler ? (
+                <>
+                  <PositionRulerRow
+                    labels={positionLabels}
+                    renderer={positionLabelRenderer}
+                    first={first}
+                    last={last}
+                    columnWidth={virtualMetrics.columnWidth}
+                    sequences={annotatedSequences}
+                    selection={selection}
+                    hoveredPosition={hoveredPosition}
+                    sequenceLength={maxSequenceLength}
+                  />
+                  <div className="nsv:flex">
+                    {Array.from({ length: last - first }, (_, offset) =>
+                      renderResidue(
+                        first + offset,
+                        sequenceIdx,
+                        virtualMetrics.columnWidth,
+                      ),
+                    )}
+                  </div>
+                </>
+              ) : (
+                Array.from({ length: last - first }, (_, offset) => {
+                  const baseIdx = first + offset;
+                  if (!isSequenceLine) {
+                    return (
+                      <SequenceAnnotationLine
+                        key={`annotation-${annotationStack}-${baseIdx}`}
+                        annotations={orderedAnnotations}
+                        index={baseIdx}
+                        stack={annotationStack}
+                        setHoveredPosition={setHoveredPosition}
+                        setActiveAnnotation={setActiveAnnotation}
+                        maxSequenceLength={maxSequenceLength}
+                        width={virtualMetrics.columnWidth}
+                      />
+                    );
+                  }
+                  return renderResidue(
+                    baseIdx,
+                    sequenceIdx,
+                    virtualMetrics.columnWidth,
                   );
-                }
-                return renderResidue(
-                  baseIdx,
-                  sequenceIdx,
-                  virtualMetrics.columnWidth,
-                );
-              })}
+                })
+              )}
             </div>
           );
         })}

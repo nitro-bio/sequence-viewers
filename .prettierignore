@@ -5,3 +5,4 @@ storybook-static
 .packed-test
 playwright-report
 test-results
+artifacts/position-labels

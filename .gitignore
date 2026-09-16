@@ -32,3 +32,6 @@ storybook-static
 playwright-report/
 test-results/
 .packed-test/
+
+# Local position-label evaluation captures
+/artifacts/position-labels/

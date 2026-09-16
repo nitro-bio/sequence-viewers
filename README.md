@@ -52,6 +52,31 @@ selection, copy, download, mismatch, and annotation behavior. Read the
 and remaining memory costs. Strings are rendered without biological alphabet validation;
 coordinate and validation contracts are in the [usage guide](docs/usage.md).
 
+## Position labels
+
+Pass `positionLabels` to label aligned columns with antibody insertion codes,
+PDB residue identifiers, or genomic coordinates. The packaged minimal renderer
+is the default; opt into the adaptive renderer for dense labels:
+
+```tsx
+import {
+  SequenceViewer,
+  AdaptivePositionLabel,
+} from "@nitro-bio/sequence-viewers";
+
+<SequenceViewer
+  sequences={["AC-GT", "ACTGT"]}
+  positionLabels={["35", "35a", null, "36", "37"]}
+  positionLabelRenderer={AdaptivePositionLabel}
+/>;
+```
+
+Each label describes one displayed column; `null` leaves it blank. Labels change
+the ruler only: selection and annotation coordinates remain zero-based column
+indices. Omit both label props to retain the existing ruler. See the
+[position-label guide](docs/position-labels.md) for `MinimalPositionLabel`,
+`AdaptivePositionLabel`, and the custom React component slot.
+
 ## Optional alignment
 
 Alignment is off by default. Viewing does not download alignment tools. Enable
@@ -96,7 +121,8 @@ pnpm test:packed
 ```
 
 Packed consumer checks cover React 18/19, plain CSS and Tailwind 3/4 integration,
-selection and copying, validation recovery, and real self-hosted MAFFT under CSP.
+position labels and virtualized rulers, selection and copying, validation
+recovery, and real self-hosted MAFFT under CSP.
 `pnpm dev` starts Storybook. `pnpm benchmark` records production-browser workload
 measurements; see [the benchmark guide](benchmarks/README.md) for reproduction.
 

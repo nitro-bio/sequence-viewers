@@ -63,6 +63,24 @@ Coordinates are zero-based and both endpoints are included. A start greater
 than end crosses the origin. Keep complete strings and coordinate conventions
 consistent when linking the linear, circular, and residue viewers.
 
+## Position labels
+
+`positionLabels?: readonly (string | null)[]` supplies display labels for aligned
+columns. Null, empty, or missing entries are blank; extra entries are ignored.
+The default `MinimalPositionLabel` component keeps labels horizontal. For dense
+numbering, use `positionLabelRenderer={AdaptivePositionLabel}` or `"adaptive"`.
+Both components and the `PositionLabelProps` and `PositionLabelRenderer` types
+are exported from the package root.
+
+You can also pass your own React component to `positionLabelRenderer`. Each
+nonblank label receives `{ label, columnIndex, isSelected, isHovered }`.
+See the [position-label guide](position-labels.md) for examples and layout behavior.
+
+Labels affect display only. Selection, annotations, and hover coordinates still
+refer to zero-based aligned columns. Keep labels synchronized with sequences
+when applying alignment results. Omit both label props to keep the original
+ruler.
+
 ## Annotations and styling
 
 Annotations are optional. A click callback receives the annotation, including `{ start, end, direction }`.
@@ -80,7 +98,8 @@ Viewing sequences does not require an alignment backend or runtime tool
 download. Enable Align with `enableAlignment` and provide `setSequences` to
 apply the result. MAFFT assets load lazily on the first action; sequence data
 stays in the browser worker. Alignment changes column coordinates, so clear or
-remap controlled selections and annotations when applying the result.
+remap controlled selections, annotations, and position labels when applying the
+result.
 
 See [self-hosted alignment](alignment-self-hosting.md) for asset setup and the
 [alignment reference](issue-80/alignment.md) for CSP, retries, and worker limits.

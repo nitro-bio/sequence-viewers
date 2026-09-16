@@ -95,6 +95,7 @@
     "docs/usage.md",
     "docs/limits.md",
     "docs/alignment-self-hosting.md",
+    "docs/position-labels.md",
     "scripts/prepare-alignment-assets.mjs"
   ],
   "styles": "./dist/nitro-sequence-viewers.css",

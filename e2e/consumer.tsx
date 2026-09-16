@@ -1,4 +1,4 @@
-import { Component, useState, version, type ReactNode } from "react";
+import { Component, useMemo, useState, version, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CircularViewer,
@@ -7,6 +7,9 @@ import {
   ReferenceTicks,
   getAnnotatedSequence,
   SequenceViewer,
+  MinimalPositionLabel,
+  AdaptivePositionLabel,
+  type PositionLabelProps,
   type Annotation,
   type AriadneSelection,
 } from "@nitro-bio/sequence-viewers";
@@ -46,6 +49,7 @@ const feature: Annotation = {
 };
 
 export function App() {
+  const labelMode = new URLSearchParams(location.search).has("labels");
   const virtualMode = new URLSearchParams(location.search).get("virtual");
   const [sequences, updateSequences] = useState([
     "ACGTACGTACGT",
@@ -105,6 +109,7 @@ export function App() {
     sequence: sequences[0] ?? "",
     stackedAnnotations: [],
   });
+  if (labelMode) return <PositionLabelsFixture />;
   return (
     <main>
       <section id="host">
@@ -303,6 +308,111 @@ function VirtualSequenceFixture() {
         />
       </div>
     </section>
+  );
+}
+
+function InteractivePositionLabel({
+  label,
+  columnIndex,
+  isSelected,
+  isHovered,
+}: PositionLabelProps) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      style={{
+        font: "inherit",
+        padding: 0,
+        border: 0,
+        background: "transparent",
+      }}
+      data-label-column={columnIndex}
+      data-selected={isSelected}
+      data-hovered={isHovered}
+      onClick={() => setExpanded((value) => !value)}
+    >
+      {expanded ? `Residue position ${label}` : label}
+    </button>
+  );
+}
+
+function PositionLabelsFixture() {
+  const params = new URLSearchParams(location.search);
+  const length = Number(params.get("length") || 120);
+  const rows = Number(params.get("rows") || 3);
+  const [width, setWidth] = useState(Number(params.get("width") || 640));
+  const [renderer, setRenderer] = useState(params.get("renderer") || "default");
+  const [supplied, setSupplied] = useState(true);
+  const [selection, setSelection] = useState<AriadneSelection | null>(null);
+  const dense = params.get("dense") === "1";
+  const sequences = useMemo(
+    () =>
+      Array.from({ length: rows }, () =>
+        "AC-GT".repeat(Math.ceil(length / 5)).slice(0, length),
+      ),
+    [length, rows],
+  );
+  const labels = useMemo(
+    () =>
+      Array.from({ length }, (_, index) =>
+        dense || index % 10 === 0 ? `${index + 35}a` : null,
+      ),
+    [length, dense],
+  );
+  return (
+    <main>
+      <label>
+        Renderer
+        <select
+          aria-label="Label renderer"
+          value={renderer}
+          onChange={(event) => setRenderer(event.target.value)}
+        >
+          <option value="default">Default</option>
+          <option value="minimal">Minimal component</option>
+          <option value="adaptive">Adaptive component</option>
+          <option value="custom">Custom component</option>
+        </select>
+      </label>
+      <label>
+        Width
+        <input
+          aria-label="Viewer width"
+          type="number"
+          value={width}
+          onChange={(event) => setWidth(Number(event.target.value))}
+        />
+      </label>
+      <button onClick={() => setSupplied((value) => !value)}>
+        Toggle supplied labels
+      </button>
+      <div
+        data-testid="label-scroller"
+        style={{
+          width,
+          height: params.has("window") ? undefined : 360,
+          overflow: "auto",
+        }}
+      >
+        <SequenceViewer
+          sequences={sequences}
+          selection={selection}
+          setSelection={setSelection}
+          hideMetadataBar
+          positionLabels={supplied ? labels : undefined}
+          positionLabelRenderer={
+            renderer === "default"
+              ? undefined
+              : renderer === "minimal"
+                ? MinimalPositionLabel
+                : renderer === "adaptive"
+                  ? AdaptivePositionLabel
+                  : InteractivePositionLabel
+          }
+        />
+      </div>
+      <output data-testid="label-selection">{JSON.stringify(selection)}</output>
+    </main>
   );
 }
 

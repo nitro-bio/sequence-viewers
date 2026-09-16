@@ -607,7 +607,18 @@ export const SeqContent = ({
   const lastVirtualLine = virtualItems[virtualItems.length - 1]?.index;
 
   useIsomorphicLayoutEffect(() => {
-    if (useVirtualRows) virtualizer.measure();
+    if (!useVirtualRows) return;
+    virtualizer.measure();
+    // Rebuild the estimates before measuring DOM rows. Otherwise an unchanged
+    // height can compare equal to the old measurement and never reenter the
+    // cleared cache, leaving the next layout to use the estimate instead.
+    virtualizer.getTotalSize();
+    // Resetting estimates drops cached heights even for rulers already mounted.
+    // Restore their measurements now; ResizeObserver need not fire again when
+    // those rows did not change size (for example after changing renderers).
+    virtualRootRef.current
+      ?.querySelectorAll<HTMLDivElement>("[data-position-ruler-line]")
+      .forEach((line) => virtualizer.measureElement(line));
   }, [estimateLineSize, useVirtualRows, virtualizer]);
 
   useIsomorphicLayoutEffect(() => {
@@ -823,6 +834,7 @@ export const SeqContent = ({
                 transform: `translateY(${virtualItem.start - scrollMargin}px)`,
               }}
               data-index={virtualItem.index}
+              data-position-ruler-line={hasRuler ? "true" : undefined}
               data-virtual-row={blockIndex}
               data-virtual-line={virtualItem.index}
               data-line-kind={isSequenceLine ? "sequence" : "annotation"}

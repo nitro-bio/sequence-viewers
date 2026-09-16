@@ -1,7 +1,7 @@
 {
   "name": "@nitro-bio/sequence-viewers",
   "private": false,
-  "version": "2.2.0",
+  "version": "2.3.0",
   "scripts": {
     "build:ci": "vite build && pnpm build-css",
     "build": "pnpm lint && vite build && pnpm build-css",
@@ -95,6 +95,7 @@
     "docs/usage.md",
     "docs/limits.md",
     "docs/alignment-self-hosting.md",
+    "docs/position-labels.md",
     "scripts/prepare-alignment-assets.mjs"
   ],
   "styles": "./dist/nitro-sequence-viewers.css",

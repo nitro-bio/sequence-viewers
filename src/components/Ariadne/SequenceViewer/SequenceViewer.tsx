@@ -697,9 +697,10 @@ export const SeqContent = ({
             if (!(lastIndex >= 0)) return;
             const end = Math.min(base.index, lastIndex);
             setSelection({
-              start: Math.min(anchor.index, end),
-              end: Math.max(anchor.index, end),
-              direction: end < anchor.index ? "reverse" : "forward",
+              // An end before the anchor selects across the sequence seam.
+              start: anchor.index,
+              end,
+              direction: "forward",
               sequenceIdx: anchor.sequenceIdx,
             });
           }

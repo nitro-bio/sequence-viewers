@@ -67,30 +67,39 @@ test("locks a drag to its starting sequence across rows and stops on release out
   expect(copySelection()).toHaveBeenCalledWith("text/plain", "C");
 });
 
-test("backward drags select a text range and can cross back over the anchor", () => {
+test("backward drags cross the seam on the starting sequence and can return over the anchor", () => {
   const setSelection = vi.fn();
   const { container } = render(
-    <SequenceViewer sequences={["ACGTA"]} setSelection={setSelection} />,
+    <SequenceViewer
+      sequences={["TTTTTTT", "ACGTA"]}
+      setSelection={setSelection}
+    />,
   );
-  fireEvent.mouseDown(rowResidue(container, 0, 2));
+  fireEvent.mouseDown(rowResidue(container, 1, 3));
   fireEvent.mouseEnter(rowResidue(container, 0, 1));
   expect(setSelection).toHaveBeenLastCalledWith({
-    start: 1,
-    end: 2,
-    direction: "reverse",
-    sequenceIdx: 0,
+    start: 3,
+    end: 1,
+    direction: "forward",
+    sequenceIdx: 1,
   });
-  expect(selectedText(container)).toBe("CG");
-  expect(copySelection()).toHaveBeenCalledWith("text/plain", "CG");
+  expect(selectedText(container)).toBe("ACTA");
+  expect(
+    container.querySelector('[data-sequence-row="0"] .nsv-sequence-selection'),
+  ).toBeNull();
+  expect(copySelection()).toHaveBeenCalledWith("text/plain", "ACTA");
+
+  fireEvent.mouseEnter(rowResidue(container, 1, 3));
+  expect(selectedText(container)).toBe("T");
 
   fireEvent.mouseEnter(rowResidue(container, 0, 4));
   expect(setSelection).toHaveBeenLastCalledWith({
-    start: 2,
+    start: 3,
     end: 4,
     direction: "forward",
-    sequenceIdx: 0,
+    sequenceIdx: 1,
   });
-  expect(selectedText(container)).toBe("GTA");
+  expect(selectedText(container)).toBe("TA");
 });
 
 test("starts on gaps, ignores padding and right clicks, and clamps to the starting sequence", () => {
@@ -168,6 +177,24 @@ test("controlled selection scopes highlighting and both copy paths by optional s
     );
     expect(selectedText(container)).toBe("TA");
     expect(copySelection()).toHaveBeenCalledWith("text/plain", "TA");
+
+    rerender(
+      <SequenceViewer
+        {...props}
+        selection={{ start: 3, end: 0, direction: "forward" }}
+      />,
+    );
+    expect(container.querySelectorAll(".nsv-sequence-selection")).toHaveLength(
+      4,
+    );
+    expect(copySelection()).toHaveBeenCalledWith(
+      "text/plain",
+      ">Sequence_1\nAT\n>Sequence_2\nTA\n",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy to clipboard" }));
+    expect(writeText).toHaveBeenLastCalledWith(
+      ">Sequence_1\nAT\n>Sequence_2\nTA\n",
+    );
   } finally {
     vi.unstubAllGlobals();
   }

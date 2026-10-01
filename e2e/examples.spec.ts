@@ -5,11 +5,13 @@ for (const example of [
     name: "Vite with React 18",
     url: "http://127.0.0.1:4174",
     heading: "Protein sequence comparison",
+    selectedText: "MVHLT",
   },
   {
     name: "Next.js App Router with React 19",
     url: "http://127.0.0.1:4175",
     heading: "Inspect and align DNA sequences",
+    selectedText: "ACGTA",
   },
 ]) {
   test(`${example.name} runs from the packed package`, async ({
@@ -26,7 +28,7 @@ for (const example of [
     ).toBeVisible();
     const viewer = page.getByTestId("viewer-example");
     await expect(viewer).toBeVisible();
-    await expect(viewer.getByText("Sequence 1", { exact: true })).toBeVisible();
+    await expect(viewer.getByRole("combobox")).toHaveCount(0);
 
     const residues = viewer
       .locator("div.nsv\\:font-mono")
@@ -34,11 +36,23 @@ for (const example of [
     await expect(residues.first()).toBeVisible();
     const copy = viewer.getByRole("button", { name: "Copy to clipboard" });
     await expect(copy).toBeDisabled();
-    await residues.nth(0).hover();
+    const firstSequence = viewer.locator('[data-sequence-row="0"]');
+    const secondSequence = viewer.locator('[data-sequence-row="1"]');
+    await secondSequence.nth(0).hover();
     await page.mouse.down();
-    await residues.nth(2).hover();
+    await firstSequence.nth(4).hover();
     await page.mouse.up();
     await expect(copy).toBeEnabled();
+    await expect(firstSequence.locator(".nsv-sequence-selection")).toHaveCount(
+      0,
+    );
+    await expect(secondSequence.locator(".nsv-sequence-selection")).toHaveCount(
+      5,
+    );
+    await copy.click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(example.selectedText);
 
     if (example.name.startsWith("Vite")) {
       await expect(residues.first()).toHaveClass(/nsv:text-sequences-primary/);

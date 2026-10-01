@@ -14,31 +14,54 @@ test("React 19: select, copy, edit, and empty the packed viewers", async ({
   const linear = page.getByTestId("linear-viewer");
   const circular = page.getByTestId("circular-viewer");
 
-  // A real drag updates the shared selection, and the portalled selector chooses
-  // which sequence the clipboard action copies.
-  const characters = sequence.locator(".caller-char");
-  await characters.filter({ hasText: /^A$/ }).first().hover();
+  // A real drag chooses the sequence at mouse-down even when it crosses rows.
+  await sequence.locator('[data-sequence-row="1"]').nth(0).hover();
   await page.mouse.down();
-  await characters.filter({ hasText: /^G$/ }).first().hover();
+  await sequence.locator('[data-sequence-row="0"]').nth(4).hover();
   await page.mouse.up();
   await expect(page.getByTestId("selection-output")).toContainText('"start":0');
-  await expect(page.getByTestId("selection-output")).toContainText('"end":2');
-  await sequence.getByRole("combobox").click();
-  await page.getByRole("option", { name: "Sequence 2" }).click();
+  await expect(page.getByTestId("selection-output")).toContainText('"end":4');
+  await expect(page.getByTestId("selection-output")).toContainText(
+    '"sequenceIdx":1',
+  );
+  await expect(
+    sequence.locator('[data-sequence-row="0"] .nsv-sequence-selection'),
+  ).toHaveCount(0);
+  await expect(
+    sequence.locator('[data-sequence-row="1"] .nsv-sequence-selection'),
+  ).toHaveCount(5);
+  await expect(sequence.getByRole("combobox")).toHaveCount(0);
   await sequence.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("ACG");
+    .toBe("ACGTT");
+
+  await sequence.locator('[data-sequence-row="1"]').nth(4).hover();
+  await page.mouse.down();
+  await sequence.locator('[data-sequence-row="1"]').nth(1).hover();
+  await page.mouse.up();
+  await expect(page.getByTestId("selection-output")).toContainText(
+    '"direction":"reverse"',
+  );
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("CGTT");
+
+  await page.getByRole("button", { name: "Select all", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(">Sequence_1\nACGTACGTACGT\n>Sequence_2\nACGTTCGTACG\n");
 
   await page.getByLabel("Sequences", { exact: true }).fill('["ACGT"]');
   await page.getByRole("button", { name: "Apply sequences" }).click();
-  await expect(sequence.getByRole("combobox")).toContainText("Sequence 1");
   await page.getByRole("button", { name: "Select all", exact: true }).click();
   await expect(linear.locator("rect").first()).toHaveAttribute("width", "100%");
   await sequence.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("ACGT");
+    .toBe(">Sequence_1\nACGT\n");
   await expect(circular).toContainText("4 bp");
 
   // Shrinking past the old selection clears copy without replaying a drag.
@@ -63,6 +86,88 @@ test("React 19: select, copy, edit, and empty the packed viewers", async ({
     await expect(circular).toContainText("0 bp");
   }
   expect(errors).toEqual([]);
+});
+
+test("gap selection uses the sequence color and respects theme and class overrides", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/");
+  await page.addStyleTag({ url: "/library.css" });
+  await page.getByLabel("Sequences", { exact: true }).fill('["ACGTA", "T-G"]');
+  await page.getByRole("button", { name: "Apply sequences" }).click();
+  const viewer = page.getByTestId("sequence-viewer");
+  const row = viewer.locator('[data-sequence-row="1"]');
+  await row.nth(1).hover();
+  await page.mouse.down();
+  await viewer.locator('[data-sequence-row="0"]').nth(4).hover();
+  await page.mouse.up();
+  await expect(page.getByTestId("selection-output")).toHaveText(
+    JSON.stringify({ start: 1, end: 2, direction: "forward", sequenceIdx: 1 }),
+  );
+  await viewer.getByRole("button", { name: "Copy to clipboard" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("-G");
+  const selectionBeforePadding = await page
+    .getByTestId("selection-output")
+    .textContent();
+  await row.nth(4).click();
+  await expect(page.getByTestId("selection-output")).toHaveText(
+    selectionBeforePadding!,
+  );
+
+  await row.nth(0).hover();
+  await page.mouse.down();
+  await row.nth(2).hover();
+  await page.mouse.up();
+  const selected = row.locator(".nsv-sequence-selection");
+  await expect(selected).toHaveCount(3);
+  const colors = await selected.evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      text: getComputedStyle(node).color,
+      background: getComputedStyle(node).backgroundColor,
+      glyph: getComputedStyle(node.firstElementChild ?? node).color,
+    })),
+  );
+  expect(new Set(colors.map((color) => color.background)).size).toBe(1);
+  expect(colors.every((color) => color.text === "rgb(124, 58, 237)")).toBe(
+    true,
+  );
+  expect(colors[0].glyph).not.toBe(colors[0].text); // Mismatch glyph stays distinct.
+  expect(colors[1].glyph).not.toBe(colors[1].text); // Gap glyph stays distinct.
+  const expectedBackground = await selected.first().evaluate((node) => {
+    const probe = document.createElement("span");
+    probe.style.color = getComputedStyle(node).color;
+    probe.style.backgroundColor =
+      "color-mix(in oklab, currentColor 20%, transparent)";
+    node.append(probe);
+    const background = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return background;
+  });
+  expect(colors[0].background).toBe(expectedBackground);
+
+  await viewer
+    .locator(".nsv-root")
+    .evaluate((node) =>
+      (node as HTMLElement).style.setProperty(
+        "--nsv-color-sequences-selection",
+        "rgb(255, 0, 0)",
+      ),
+    );
+  await expect(selected.first()).not.toHaveCSS(
+    "background-color",
+    expectedBackground,
+  );
+  await page.addStyleTag({
+    content: ".caller-selection { background-color: rgb(0, 100, 255); }",
+  });
+  await expect(selected.first()).toHaveCSS(
+    "background-color",
+    "rgb(0, 100, 255)",
+  );
 });
 
 test("malformed annotations recover locally, with strict errors handled by the host", async ({
@@ -134,7 +239,7 @@ test("large packed sequences window scrolling while preserving logical selection
   await viewer.getByRole("button", { name: "Copy to clipboard" }).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("ACGTACGTACG");
+    .toBe(">Sequence_1\nACGTACGTACG\n>Sequence_2\nACGTACGTACG\n");
 
   await virtualRoot.evaluate((root) => {
     const columns = Number((root as HTMLElement).dataset.columnsPerRow);
@@ -169,7 +274,7 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(page.getByTestId("virtual-annotation-clicks")).toHaveText("1");
 
   const firstSelectedResidue = virtualRoot.locator(
-    '[data-sequence-row="0"][data-sequence-position="15000"]',
+    '[data-sequence-row="1"][data-sequence-position="15000"]',
   );
   await firstSelectedResidue.hover();
   await page.mouse.down();
@@ -180,6 +285,12 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(page.getByTestId("virtual-selection")).toContainText(
     '"end":15002',
   );
+  await expect(page.getByTestId("virtual-selection")).toContainText(
+    '"sequenceIdx":1',
+  );
+  await expect(
+    virtualRoot.locator('[data-sequence-row="0"] .nsv-sequence-selection'),
+  ).toHaveCount(0);
 
   const columnsBeforeResize = await virtualRoot.evaluate((root) =>
     Number((root as HTMLElement).dataset.columnsPerRow),

@@ -1,0 +1,125 @@
+.smart-selection-demo {
+  max-width: 900px;
+  margin: 48px auto;
+  padding: 0 24px;
+  color: #1e293b;
+  font-family: system-ui, sans-serif;
+}
+
+.smart-selection-demo > * + * {
+  margin-top: 24px;
+}
+
+.smart-selection-demo h1 {
+  margin: 8px 0;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.8px;
+  line-height: 1.2;
+}
+
+.smart-selection-eyebrow {
+  color: #047857;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.smart-selection-intro {
+  max-width: 680px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.smart-selection-legend,
+.smart-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.smart-selection-legend {
+  font-weight: 600;
+  gap: 24px;
+}
+
+.smart-selection-viewer {
+  padding: 12px 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 6px #0f172a08;
+}
+
+.smart-selection-actions button {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.smart-selection-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.smart-selection-actions .smart-selection-primary {
+  color: white;
+  background: #0f172a;
+  border-color: #0f172a;
+}
+
+.smart-selection-actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+}
+
+.smart-selection-status {
+  color: #475569;
+  font-size: 14px;
+}
+
+.smart-selection-paste {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.smart-selection-paste textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font:
+    14px/1.6 ui-monospace,
+    monospace;
+  resize: vertical;
+}
+
+.smart-selection-demo .smart-selection-green {
+  color: #047857;
+}
+
+.smart-selection-demo .smart-selection-indigo {
+  color: #4f46e5;
+}
+
+.smart-selection-demo .smart-selection-amber {
+  color: #b45309;
+}
+
+.smart-selection-demo .smart-selection-override {
+  background-color: #fecdd3;
+}

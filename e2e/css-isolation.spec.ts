@@ -15,7 +15,7 @@ const hostSnapshot = (page: Page) =>
 
 for (const framework of ["plain", "tailwind3", "tailwind4"]) {
   for (const order of ["before", "after"] as const) {
-    test(`${framework}: viewers and portals coexist with library CSS ${order} host CSS`, async ({
+    test(`${framework}: viewers coexist with library CSS ${order} host CSS`, async ({
       page,
     }) => {
       await page.goto(`/?framework=${framework}`);
@@ -68,16 +68,23 @@ for (const framework of ["plain", "tailwind3", "tailwind4"]) {
         page.getByTestId("standalone-gutter").locator(".nsv-root"),
       ).toHaveCSS("box-sizing", "border-box");
 
-      await sequence.getByRole("combobox").click();
-      const portal = page.locator(".nsv-portal");
-      await expect(portal).toBeVisible();
-      await expect(portal).toHaveCSS("border-top-width", "1px");
-      await expect(portal).not.toHaveCSS(
+      await expect(sequence.getByRole("combobox")).toHaveCount(0);
+      const selections = sequence.locator(".nsv-sequence-selection");
+      const firstBackground = await selections
+        .first()
+        .evaluate((node) => getComputedStyle(node).backgroundColor);
+      const secondBackground = await sequence
+        .locator('[data-sequence-row="1"] .nsv-sequence-selection')
+        .first()
+        .evaluate((node) => getComputedStyle(node).backgroundColor);
+      expect(firstBackground).not.toBe(secondBackground);
+      await page.addStyleTag({
+        content: ".caller-selection { background-color: rgb(255, 200, 0); }",
+      });
+      await expect(selections.first()).toHaveCSS(
         "background-color",
-        "rgba(0, 0, 0, 0)",
+        "rgb(255, 200, 0)",
       );
-      await page.getByRole("option", { name: "Sequence 2" }).click();
-      await expect(sequence.getByRole("combobox")).toContainText("Sequence 2");
     });
   }
 }

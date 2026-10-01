@@ -79,9 +79,9 @@ built-in keyboard selection model. Annotation segments are also clickable and
 hoverable `div` elements without keyboard activation. Hovered coordinates and
 annotation metadata therefore have the same pointer-only limitation.
 
-The metadata bar exposes the sequence picker as a labeled combobox and uses
-named buttons for copy, download, and alignment actions. The packed consumer
-suite exercises these controls in Chromium with pointer input. It does not
+The metadata bar uses named buttons for copy, download, and alignment actions.
+Mouse selection automatically chooses the sequence where the drag starts. The
+packed consumer suite exercises these controls in Chromium with pointer input. It does not
 currently prove end-to-end keyboard navigation or screen-reader behavior.
 
 For a keyboard-accessible workflow, keep selection controlled and provide host

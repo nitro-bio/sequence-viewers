@@ -31,13 +31,6 @@ import type {
 const useIsomorphicLayoutEffect =
   typeof document === "undefined" ? useEffect : useLayoutEffect;
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-  SelectTrigger,
-} from "@ui/select";
 import { CopyButton } from "@ui/copy-button";
 import { Button } from "@ui/button/button";
 import { DownloadIcon } from "lucide-react";
@@ -156,7 +149,6 @@ export const SequenceViewer = ({
     [isSelectionControlled, setSequences, updateSelection],
   );
   const [hoveredPosition, setHoveredPosition] = useState<number | null>(null);
-  const [seqIdxToCopy, setSeqIdxToCopy] = useState<number>(0);
   const [activeAnnotation, setActiveAnnotation] =
     useState<StackedAnnotation | null>(null);
   const annotationsInput = normalizeAnnotationsInput(annotations);
@@ -199,20 +191,20 @@ export const SequenceViewer = ({
     },
     [validatedSequences, stackedAnnotations],
   );
+  const selectionSequenceLength =
+    currentSelection?.sequenceIdx === undefined
+      ? maxSequenceLength
+      : (annotatedSequences[currentSelection.sequenceIdx]?.length ?? 0);
   const displayedSelection = useMemo(
     () =>
-      maxSequenceLength === 0
+      selectionSequenceLength === 0
         ? null
         : clampSlice({
             slice: currentSelection,
             firstIdx: 0,
-            lastIdx: maxSequenceLength - 1,
+            lastIdx: selectionSequenceLength - 1,
           }),
-    [currentSelection, maxSequenceLength],
-  );
-  const safeSeqIdxToCopy = Math.max(
-    0,
-    Math.min(seqIdxToCopy, Math.max(annotatedSequences.length - 1, 0)),
+    [currentSelection, selectionSequenceLength],
   );
   const hasSequenceData = annotatedSequences.some(
     (annotatedSequence) => annotatedSequence.length > 0,
@@ -241,9 +233,6 @@ export const SequenceViewer = ({
 
   useEffect(
     function resetStaleMetadata() {
-      if (seqIdxToCopy !== safeSeqIdxToCopy) {
-        setSeqIdxToCopy(safeSeqIdxToCopy);
-      }
       if (
         hoveredPosition !== null &&
         (hoveredPosition < 0 || hoveredPosition >= maxSequenceLength)
@@ -254,14 +243,7 @@ export const SequenceViewer = ({
         setActiveAnnotation(null);
       }
     },
-    [
-      activeAnnotation,
-      hoveredPosition,
-      maxSequenceLength,
-      safeSeqIdxToCopy,
-      seqIdxToCopy,
-      stackedAnnotations,
-    ],
+    [activeAnnotation, hoveredPosition, maxSequenceLength, stackedAnnotations],
   );
   useEffect(
     function mountCopyHandler() {
@@ -272,7 +254,6 @@ export const SequenceViewer = ({
         const stringToCopy = getStringToCopy(
           annotatedSequences,
           displayedSelection,
-          safeSeqIdxToCopy,
         );
         if (!stringToCopy) {
           return;
@@ -285,7 +266,7 @@ export const SequenceViewer = ({
         document.removeEventListener("copy", copyHandler);
       };
     },
-    [annotatedSequences, displayedSelection, hasSequenceData, safeSeqIdxToCopy],
+    [annotatedSequences, displayedSelection, hasSequenceData],
   );
 
   const memoizedSeqContent = useMemo(() => {
@@ -353,8 +334,6 @@ export const SequenceViewer = ({
           className="nsv:sticky nsv:inset-x-0 nsv:top-0 nsv:z-3 nsv:w-full nsv:px-2 nsv:py-1 nsv:[backdrop-filter:blur(12px)]"
           annotatedSequences={annotatedSequences}
           charClassName={charClassName}
-          seqIdxToCopy={safeSeqIdxToCopy}
-          setSeqIdxToCopy={setSeqIdxToCopy}
           selection={displayedSelection}
           hideDownloadButton={hideDownloadButton}
           alignmentEnabled={enableAlignment}
@@ -418,7 +397,9 @@ export const SeqContent = ({
   hoveredPosition?: number | null;
 }) => {
   const VIRTUAL_CELL_THRESHOLD = 5_000;
-  const mouseDown = useRef(false);
+  const dragAnchor = useRef<{ index: number; sequenceIdx: number } | null>(
+    null,
+  );
   const virtualRootRef = useRef<HTMLDivElement>(null);
   const measuringGlyphRef = useRef<HTMLSpanElement>(null);
   const [virtualMetrics, setVirtualMetrics] = useState({
@@ -431,7 +412,7 @@ export const SeqContent = ({
   const previousColumnsRef = useRef<number>();
   const visibleLineRef = useRef(0);
   const handleMouseUp = useCallback(() => {
-    mouseDown.current = false;
+    dragAnchor.current = null;
   }, []);
   const indicesClassName = ({
     base,
@@ -460,8 +441,10 @@ export const SeqContent = ({
   useEffect(
     function addMouseUpListener() {
       document.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("blur", handleMouseUp);
       return function removeMouseUpListener() {
         document.removeEventListener("mouseup", handleMouseUp);
+        window.removeEventListener("blur", handleMouseUp);
       };
     },
     [handleMouseUp],
@@ -707,17 +690,30 @@ export const SeqContent = ({
         data-sequence-row={sequenceIdx}
         onMouseEnter={() => {
           setHoveredPosition(base.index);
-          if (mouseDown.current && selection) {
-            setSelection({ ...selection, end: base.index });
+          const anchor = dragAnchor.current;
+          if (anchor) {
+            const lastIndex =
+              annotatedSequences[anchor.sequenceIdx]?.length - 1;
+            if (!(lastIndex >= 0)) return;
+            const end = Math.min(base.index, lastIndex);
+            setSelection({
+              start: Math.min(anchor.index, end),
+              end: Math.max(anchor.index, end),
+              direction: end < anchor.index ? "reverse" : "forward",
+              sequenceIdx: anchor.sequenceIdx,
+            });
           }
         }}
         onMouseLeave={() => setHoveredPosition(null)}
-        onMouseDown={() => {
-          mouseDown.current = true;
+        onMouseDown={(event) => {
+          if (event.button !== 0 || base.base === " ") return;
+          event.preventDefault();
+          dragAnchor.current = { index: base.index, sequenceIdx };
           setSelection({
             start: base.index,
             end: base.index,
             direction: "forward",
+            sequenceIdx,
           });
         }}
         onMouseUp={handleMouseUp}
@@ -739,15 +735,19 @@ export const SeqContent = ({
           index={baseIdx}
           charClassName={classNames(
             charClassName({ base, sequenceIdx }),
-            isMisaligned && "nsv:text-sequences-mismatch!",
-            ["-", " "].includes(base.base) && "nsv:text-sequences-gap!",
-            baseInSelection({
-              baseIndex: baseIdx,
-              selection,
-              sequenceLength: annotatedSequences[sequenceIdx].length,
-            }) &&
+            (selection?.sequenceIdx === undefined ||
+              selection.sequenceIdx === sequenceIdx) &&
+              baseInSelection({
+                baseIndex: baseIdx,
+                selection,
+                sequenceLength: annotatedSequences[sequenceIdx].length,
+              }) &&
               base.base !== " " &&
               classNames("nsv-sequence-selection", selectionClassName),
+          )}
+          glyphClassName={classNames(
+            isMisaligned && "nsv:text-sequences-mismatch!",
+            ["-", " "].includes(base.base) && "nsv:text-sequences-gap!",
           )}
         />
       </div>
@@ -957,8 +957,6 @@ export const SeqMetadataBar = ({
   activeAnnotation,
   annotatedSequences,
   charClassName,
-  seqIdxToCopy,
-  setSeqIdxToCopy,
   selection,
   className,
   hideDownloadButton,
@@ -972,8 +970,6 @@ export const SeqMetadataBar = ({
   activeAnnotation: Annotation | null;
   selection: AriadneSelection | null;
   annotatedSequences: AnnotatedBase[][];
-  seqIdxToCopy: number;
-  setSeqIdxToCopy: (idx: number) => void;
   charClassName: ({
     base,
     sequenceIdx,
@@ -1124,8 +1120,6 @@ export const SeqMetadataBar = ({
       <CopyDisplay
         annotatedSequences={annotatedSequences}
         charClassName={charClassName}
-        seqIdxToCopy={seqIdxToCopy}
-        setSeqIdxToCopy={setSeqIdxToCopy}
         selection={selection}
       />
       {positionDisplay}
@@ -1212,9 +1206,14 @@ interface CharProps {
   char: string;
   index: number;
   charClassName: string;
+  glyphClassName?: string;
 }
 
-export const CharComponent = ({ char, charClassName }: CharProps) => {
+export const CharComponent = ({
+  char,
+  charClassName,
+  glyphClassName,
+}: CharProps) => {
   // don't allow selection of chars
   const sharedClassName = "nsv:font-mono nsv:select-none";
   if (char === " ") {
@@ -1222,26 +1221,23 @@ export const CharComponent = ({ char, charClassName }: CharProps) => {
       <div
         className={classNames(sharedClassName, charClassName, "nsv:opacity-20")}
       >
-        .
+        <span className={glyphClassName}>.</span>
       </div>
     );
   }
   return (
     <div className={classNames(sharedClassName, charClassName, "nsv:mr-px")}>
-      {char}
+      {/* Keep the selection background in the sequence color even for gaps/mismatches. */}
+      {glyphClassName ? <span className={glyphClassName}>{char}</span> : char}
     </div>
   );
 };
 
 export const CopyDisplay = ({
-  seqIdxToCopy,
-  setSeqIdxToCopy,
   annotatedSequences,
   charClassName,
   selection,
 }: {
-  seqIdxToCopy: number;
-  setSeqIdxToCopy: (idx: number) => void;
   selection: AriadneSelection | null;
   annotatedSequences: AnnotatedBase[][];
   charClassName: ({
@@ -1253,69 +1249,33 @@ export const CopyDisplay = ({
   }) => string;
   className?: string;
 }) => {
-  const safeSeqIdxToCopy = Math.max(
-    0,
-    Math.min(seqIdxToCopy, Math.max(annotatedSequences.length - 1, 0)),
+  const sequenceIdx = selection?.sequenceIdx ?? 0;
+  const selectedSequence = annotatedSequences[sequenceIdx];
+  const styleBase = selectedSequence?.[0];
+  const hasCopyableSelection = Boolean(
+    selection &&
+      annotatedSequences.some(
+        (sequence, index) =>
+          (selection.sequenceIdx === undefined ||
+            selection.sequenceIdx === index) &&
+          sequence.length > 0 &&
+          (selection.start > selection.end ||
+            selection.start < sequence.length),
+      ),
   );
-  const selectedSequence = annotatedSequences[safeSeqIdxToCopy];
-  const hasSelectedSequence = Boolean(selectedSequence?.length);
-  const getStyleBase = (sequenceIdx: number): AnnotatedBase =>
-    annotatedSequences[sequenceIdx]?.[0] ?? {
-      base: " ",
-      annotations: [],
-      index: 0,
-    };
   return (
     <span className="nsv:flex nsv:items-center nsv:gap-2 nsv:px-1 nsv:py-px">
-      <Select
-        value={safeSeqIdxToCopy.toString()}
-        onValueChange={(value) => setSeqIdxToCopy(parseInt(value))}
-        disabled={annotatedSequences.length === 0}
-      >
-        <SelectTrigger
-          aria-label="Sequence to copy"
-          className={classNames(
-            charClassName({
-              base: getStyleBase(safeSeqIdxToCopy),
-              sequenceIdx: safeSeqIdxToCopy,
-            }),
-            "nsv:text-sequences-foreground nsv:w-fit nsv:rounded-none nsv:[border-right-width:1px]",
-          )}
-        >
-          <SelectValue>Sequence {safeSeqIdxToCopy + 1}</SelectValue>
-        </SelectTrigger>
-        <SelectContent className="nsv:text-sequences-foreground nsv:bg-sequences-background">
-          {annotatedSequences.map((_, idx) => (
-            <SelectItem
-              key={`sequence-${idx}`}
-              value={idx.toString()}
-              className={charClassName({
-                base: getStyleBase(idx),
-                sequenceIdx: idx,
-              })}
-            >
-              Sequence {idx + 1}{" "}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
       <CopyButton
-        textToCopy={() => {
-          if (!selection) {
-            return "";
-          }
-          return getStringToCopy(
-            annotatedSequences,
-            selection,
-            safeSeqIdxToCopy,
-          );
-        }}
+        textToCopy={() =>
+          selection ? getStringToCopy(annotatedSequences, selection) : ""
+        }
         label={""}
-        disabled={!selection || !hasSelectedSequence}
-        buttonClassName={charClassName({
-          base: getStyleBase(safeSeqIdxToCopy),
-          sequenceIdx: safeSeqIdxToCopy,
-        })}
+        disabled={!hasCopyableSelection}
+        buttonClassName={
+          styleBase
+            ? charClassName({ base: styleBase, sequenceIdx })
+            : undefined
+        }
       />
     </span>
   );
@@ -1324,21 +1284,29 @@ export const CopyDisplay = ({
 const getStringToCopy = (
   annotatedSequences: AnnotatedBase[][],
   selection: AriadneSelection,
-  seqIdxToCopy: number,
 ) => {
-  const seq = annotatedSequences[seqIdxToCopy];
-  if (!seq || seq.length === 0) {
-    return "";
+  const selectedText = (seq: AnnotatedBase[]) =>
+    seq
+      .filter(
+        (base) =>
+          base.base !== " " &&
+          baseInSelection({
+            baseIndex: base.index,
+            selection: selection,
+            sequenceLength: seq.length,
+          }),
+      )
+      .map((base) => base.base)
+      .join("");
+  if (selection.sequenceIdx !== undefined) {
+    return selectedText(annotatedSequences[selection.sequenceIdx] ?? []);
   }
-  const stringToCopy = seq
-    .filter((base) =>
-      baseInSelection({
-        baseIndex: base.index,
-        selection: selection,
-        sequenceLength: seq.length,
-      }),
-    )
-    .map((base) => base.base)
+  return annotatedSequences
+    .map((sequence, index) => {
+      const text = selectedText(sequence);
+      if (!text) return "";
+      const wrapped = text.match(/.{1,60}/g)?.join("\n");
+      return `>Sequence_${index + 1}\n${wrapped}\n`;
+    })
     .join("");
-  return stringToCopy;
 };

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { SequenceViewer } from ".";
 import type { AnnotatedBase, AriadneSelection } from "../types";
+import "./smartSelectionDemo.css";
 
 export default {
   title: "Ariadne/SequenceViewer",
@@ -73,6 +74,106 @@ const SequenceStory = ({
 export const OneSequence = () => <SequenceStory numSequences={1} />;
 export const TwoSequences = () => <SequenceStory numSequences={2} />;
 export const EightSequences = () => <SequenceStory numSequences={8} />;
+
+export const SmartSelection = () => {
+  const sequences = [
+    "ATGACCTGACGTTAGCTAGCATGCTAGCTACGATCGATGCTAGCTAGGCTAACGTTAGCTAGCATGCTAGCTACGATCGATGCTAGCTAGGCTAACGT",
+    "ATGACC--ACGTTAGCTAGCATGCTAGCTACGATCGATGCTAGCTAGGCTAACGTTAGCTAGCATGCTAGCTACGATCGATGCTAGCTAGGCTAACGT",
+    "ATGACCTGACGTTAGCTAGCATGCTAGCTACGATCGATGCTAGCTAGGCTAACGTTAGCTAGCATGC",
+  ];
+  const colors = [
+    "smart-selection-green",
+    "smart-selection-indigo",
+    "smart-selection-amber",
+  ];
+  const [selection, setSelection] = useState<AriadneSelection | null>({
+    start: 4,
+    end: 15,
+    direction: "forward",
+    sequenceIdx: 1,
+  });
+  const [customHighlight, setCustomHighlight] = useState(false);
+
+  return (
+    <main className="smart-selection-demo">
+      <header>
+        <p className="smart-selection-eyebrow">Sequence viewer demo</p>
+        <h1>Start anywhere. Stay on that sequence.</h1>
+        <p className="smart-selection-intro">
+          Drag across characters in any row. The starting sequence stays
+          selected, even when you drag backward or cross another row. Try
+          starting on a gap, too.
+        </p>
+      </header>
+
+      <div className="smart-selection-legend">
+        {colors.map((color, index) => (
+          <span key={color} className={color}>
+            ● Sequence {index + 1}
+          </span>
+        ))}
+      </div>
+
+      <section className="smart-selection-viewer">
+        <SequenceViewer
+          sequences={sequences}
+          selection={selection}
+          setSelection={setSelection}
+          charClassName={({ sequenceIdx }) => colors[sequenceIdx]}
+          selectionClassName={
+            customHighlight ? "smart-selection-override" : undefined
+          }
+          hideDownloadButton
+          positionLabelRenderer="minimal"
+        />
+      </section>
+
+      <div className="smart-selection-actions">
+        <button
+          className="smart-selection-primary"
+          disabled={!selection}
+          onClick={() => {
+            if (selection) {
+              setSelection({
+                start: selection.start,
+                end: selection.end,
+                direction: selection.direction,
+              });
+            }
+          }}
+        >
+          Select this range in all sequences
+        </button>
+        <button onClick={() => setSelection(null)}>Clear selection</button>
+        <label>
+          <input
+            type="checkbox"
+            checked={customHighlight}
+            onChange={(event) => setCustomHighlight(event.target.checked)}
+          />
+          Override highlight with pink
+        </label>
+      </div>
+
+      <p aria-live="polite" className="smart-selection-status">
+        {selection
+          ? `${selection.sequenceIdx === undefined ? "All sequences" : `Sequence ${selection.sequenceIdx + 1}`} · positions ${selection.start}–${selection.end} (zero-based) · copy as ${selection.sequenceIdx === undefined ? "FASTA" : "plain text"}`
+          : "No selection. Drag over characters to begin."}
+      </p>
+
+      <label className="smart-selection-paste">
+        <span>Copy your selection, then paste here</span>
+        <textarea
+          rows={6}
+          placeholder={
+            "Use the copy icon above or ⌘C / Ctrl+C.\nOne sequence copies as text; all sequences copy as FASTA."
+          }
+        />
+      </label>
+    </main>
+  );
+};
+
 export const SequenceViewerStoryForwardSelectionOverSeam = () => (
   <SequenceStory
     numSequences={1}
@@ -112,11 +213,12 @@ export const SequenceViewerStoryCustomClassNames = () => (
 
 export const SequenceViewerStorySecondSequence = () => (
   <SequenceStory
-    numSequences={1}
+    numSequences={2}
     initialSelection={{
       start: 5,
       end: 10,
       direction: "reverse",
+      sequenceIdx: 1,
     }}
   />
 );

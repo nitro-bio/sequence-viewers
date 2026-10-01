@@ -83,4 +83,6 @@ export const ariadneSelectionSchema = z.object({
   start: z.number(),
   end: z.number(),
   direction: z.union([z.literal("forward"), z.literal("reverse")]),
+  /** Zero-based SequenceViewer row. Omit to highlight all sequences. */
+  sequenceIdx: z.number().int().nonnegative().optional(),
 });

@@ -86,8 +86,11 @@ export function App() {
         enableAlignment={enableAlignment}
         alignmentConfig={{ urlCDN: new URL("/assets", location.origin).href }}
         containerClassName="caller-container"
-        charClassName={() => "caller-char"}
+        charClassName={({ sequenceIdx }) =>
+          `caller-char caller-row-${sequenceIdx}`
+        }
         selectionClassName="caller-selection"
+        highlightMisalignments
       />
     ),
     linear: (

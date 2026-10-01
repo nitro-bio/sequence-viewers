@@ -27,6 +27,9 @@ section {
 .caller-char {
   color: #0f766e;
 }
+.caller-row-1 {
+  color: #7c3aed;
+}
 .caller-annotation {
   background: #fbbf24;
   fill: #fbbf24;

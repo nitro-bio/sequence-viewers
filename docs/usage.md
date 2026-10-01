@@ -33,6 +33,23 @@ Omit `selection` to let the viewer manage selection internally. An optional
 to control it from your application. Explicit `selection={null}` means a
 controlled empty selection; it does not enable internal state.
 
+Starting a mouse selection chooses the sequence under the first character and
+locks the drag to that sequence. Only its selected range is highlighted. Gaps
+(`-`) can start a selection; empty padding cannot. Dragging backward selects the
+range between the anchor and the current character, like ordinary text.
+
+`AriadneSelection` accepts an optional zero-based `sequenceIdx`. For example,
+`{ start: 1, end: 4, direction: "forward", sequenceIdx: 1 }` selects those columns
+only in the second sequence. Mouse selections include this field. Omit it to
+highlight the range in every sequence, including selections shared from another
+viewer. An index that no longer exists displays no residue selection.
+
+The copy button and keyboard copy use the same selection. With `sequenceIdx`,
+they copy the selected range as plain text. Without it, they copy all nonempty
+selected ranges as FASTA records headed `>Sequence_1`, `>Sequence_2`, and so on,
+with lines wrapped at 60 characters. Original case and alignment gaps are
+preserved; padding and empty ranges are omitted.
+
 ```tsx
 "use client";
 
@@ -59,9 +76,11 @@ export default function ControlledSequence() {
 }
 ```
 
-Coordinates are zero-based and both endpoints are included. A start greater
-than end crosses the origin. Keep complete strings and coordinate conventions
-consistent when linking the linear, circular, and residue viewers.
+Coordinates are zero-based and both endpoints are included. An externally
+supplied start greater than end crosses the origin. Mouse drags emit ordered
+endpoints and indicate backward dragging with `direction: "reverse"`. Keep
+complete strings and coordinate conventions consistent when linking the linear,
+circular, and residue viewers.
 
 ## Position labels
 
@@ -89,8 +108,10 @@ Version 2.1 fixes the misspelled `diection` field emitted in version 2.0.
 
 `charClassName` is optional. Its `{ base, sequenceIdx }` argument lets you choose
 residue classes from your application's CSS. Customize the public
-`--nsv-color-sequences-*` tokens for theming, including `.nsv-portal` for the
-sequence dropdown. See the [CSS guide](issue-80/css-isolation.md).
+`--nsv-color-sequences-*` tokens for theming. The default selection background
+uses a translucent version of each residue's sequence color, including at gaps
+and mismatches. Override it with `selectionClassName` or
+`--nsv-color-sequences-selection`. See the [CSS guide](issue-80/css-isolation.md).
 
 ## Optional alignment
 

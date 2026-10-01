@@ -41,6 +41,7 @@ test("custom labels replace the index ruler and remain presentation-only", () =>
     start: 1,
     end: 1,
     direction: "forward",
+    sequenceIdx: 0,
   });
 
   rerender(<SequenceViewer {...props} positionLabels={["updated"]} />);

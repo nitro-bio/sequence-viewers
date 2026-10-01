@@ -123,7 +123,7 @@
   :where(.nsv-sequence-selection) {
     background-color: color-mix(
       in oklab,
-      var(--nsv-color-sequences-selection, oklch(59.6% 0.145 163.225)) 20%,
+      var(--nsv-color-sequences-selection, currentColor) 20%,
       transparent
     );
   }

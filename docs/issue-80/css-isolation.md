@@ -61,18 +61,16 @@ no longer affect library defaults. Move viewer-specific overrides to the
 were not reliable hooks in the previous inline theme. This is an intentional
 version-2 theming change.
 
-Override them on a viewer root. Radix Select renders outside that root, so put
-portal-specific foreground and background overrides on `.nsv-portal` as well:
+Override them on a viewer root. In `SequenceViewer`, the default selection
+background follows the sequence's text color at 20% opacity, even when gap or
+mismatch glyphs have their own colors. Set `--nsv-color-sequences-selection` to
+choose a shared selection color, or use `selectionClassName` to override the
+background directly:
 
 ```css
 .my-sequence-viewer {
   --nsv-color-sequences-primary: #047857;
   --nsv-color-sequences-selection: #059669;
-  --nsv-color-sequences-foreground: #27272a;
-  --nsv-color-sequences-background: #fafafa;
-}
-
-.nsv-portal {
   --nsv-color-sequences-foreground: #27272a;
   --nsv-color-sequences-background: #fafafa;
 }
@@ -94,8 +92,8 @@ and host buttons and inputs lose native borders and padding.
 The packed-package browser suite loads the version-2 stylesheet before and
 after a plain host stylesheet, Tailwind 3, and Tailwind 4. It compares computed
 host element styles and host theme variables before and after loading, checks
-all three viewers, verifies caller class hooks, and opens the portal-rendered
-sequence menu to check its layout, border, typography, and colors. The suite
+all three viewers, verifies caller class hooks, and checks sequence-colored
+selection backgrounds and explicit highlight overrides. The suite
 uses the tarball produced by `npm pack`; source imports and jsdom results are not
 used as evidence for CSS isolation.
 
@@ -108,6 +106,4 @@ at-rule only declares cascade-layer order and has no style declarations.
 ## Limits
 
 The package does not use Shadow DOM. Host selectors with higher specificity or
-`!important` can intentionally override viewer styles. Portal content is not a
-descendant of the viewer root, so a theme scoped only to a caller container
-cannot reach it; mirror the relevant tokens on `.nsv-portal`.
+`!important` can intentionally override viewer styles.

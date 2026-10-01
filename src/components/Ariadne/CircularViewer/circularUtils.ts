@@ -185,8 +185,8 @@ export const clampSlice = ({
     start = Math.max(start, firstIdx);
   }
   return {
+    ...slice,
     start,
     end,
-    direction: slice.direction,
   };
 };

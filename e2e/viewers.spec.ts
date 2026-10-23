@@ -38,15 +38,31 @@ test("React 19: select, copy, edit, and empty the packed viewers", async ({
 
   await sequence.locator('[data-sequence-row="1"]').nth(4).hover();
   await page.mouse.down();
-  await sequence.locator('[data-sequence-row="1"]').nth(1).hover();
+  await sequence.locator('[data-sequence-row="0"]').nth(1).hover();
   await page.mouse.up();
-  await expect(page.getByTestId("selection-output")).toContainText(
-    '"direction":"reverse"',
+  await expect(page.getByTestId("selection-output")).toHaveText(
+    JSON.stringify({ start: 4, end: 1, direction: "forward", sequenceIdx: 1 }),
   );
+  await expect(
+    sequence.locator('[data-sequence-row="0"] .nsv-sequence-selection'),
+  ).toHaveCount(0);
+  await expect(
+    sequence.locator('[data-sequence-row="1"] .nsv-sequence-selection'),
+  ).toHaveCount(9);
+  await expect(
+    sequence
+      .locator('[data-sequence-row="1"]')
+      .nth(2)
+      .locator(".nsv-sequence-selection"),
+  ).toHaveCount(0);
   await page.keyboard.press("ControlOrMeta+c");
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe("CGTT");
+    .toBe("ACTCGTACG");
+  await sequence.getByRole("button", { name: "Copy to clipboard" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("ACTCGTACG");
 
   await page.getByRole("button", { name: "Select all", exact: true }).click();
   await page.keyboard.press("ControlOrMeta+c");
@@ -291,6 +307,37 @@ test("large packed sequences window scrolling while preserving logical selection
   await expect(
     virtualRoot.locator('[data-sequence-row="0"] .nsv-sequence-selection'),
   ).toHaveCount(0);
+
+  // A backward drag also spans the seam when most of that range is unmounted.
+  await virtualRoot
+    .locator('[data-sequence-row="1"][data-sequence-position="15002"]')
+    .hover();
+  await page.mouse.down();
+  await virtualRoot
+    .locator('[data-sequence-row="0"][data-sequence-position="15000"]')
+    .hover();
+  await page.mouse.up();
+  await expect(page.getByTestId("virtual-selection")).toHaveText(
+    JSON.stringify({
+      start: 15002,
+      end: 15000,
+      direction: "forward",
+      sequenceIdx: 1,
+    }),
+  );
+  await expect(
+    virtualRoot.locator('[data-sequence-row="0"] .nsv-sequence-selection'),
+  ).toHaveCount(0);
+  await expect(
+    virtualRoot.locator(
+      '[data-sequence-row="1"][data-sequence-position="15001"] .nsv-sequence-selection',
+    ),
+  ).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Copy to clipboard" }).click();
+  const fullSequence = "ACGT".repeat(5_000);
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(fullSequence.slice(0, 15001) + fullSequence.slice(15002));
 
   const columnsBeforeResize = await virtualRoot.evaluate((root) =>
     Number((root as HTMLElement).dataset.columnsPerRow),

@@ -101,8 +101,9 @@ export const SmartSelection = () => {
         <h1>Start anywhere. Stay on that sequence.</h1>
         <p className="smart-selection-intro">
           Drag across characters in any row. The starting sequence stays
-          selected, even when you drag backward or cross another row. Try
-          starting on a gap, too.
+          selected, even when you cross another row. Drag backward to select
+          across the seam, from the end of the sequence back to the beginning.
+          Try starting on a gap, too.
         </p>
       </header>
 

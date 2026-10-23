@@ -35,8 +35,9 @@ controlled empty selection; it does not enable internal state.
 
 Starting a mouse selection chooses the sequence under the first character and
 locks the drag to that sequence. Only its selected range is highlighted. Gaps
-(`-`) can start a selection; empty padding cannot. Dragging backward selects the
-range between the anchor and the current character, like ordinary text.
+(`-`) can start a selection; empty padding cannot. Dragging to an earlier
+character selects across the seam: from the starting character through the end
+of the sequence, then from the beginning through the current character.
 
 `AriadneSelection` accepts an optional zero-based `sequenceIdx`. For example,
 `{ start: 1, end: 4, direction: "forward", sequenceIdx: 1 }` selects those columns
@@ -76,9 +77,9 @@ export default function ControlledSequence() {
 }
 ```
 
-Coordinates are zero-based and both endpoints are included. An externally
-supplied start greater than end crosses the origin. Mouse drags emit ordered
-endpoints and indicate backward dragging with `direction: "reverse"`. Keep
+Coordinates are zero-based and both endpoints are included. A start greater
+than end crosses the origin. Mouse drags keep `start` at the initial character,
+update `end` to the current character, and emit `direction: "forward"`. Keep
 complete strings and coordinate conventions consistent when linking the linear,
 circular, and residue viewers.
 

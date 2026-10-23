@@ -1,5 +1,12 @@
 # @nitro-bio/sequence-viewers
 
+## 2.4.1
+
+### Patch Changes
+
+- c4d05e9: Restore selection across the sequence seam when dragging backward. Keep the
+  starting sequence locked while highlighting and copying the wrapped range.
+
 ## 2.4.0
 
 ### Minor Changes
